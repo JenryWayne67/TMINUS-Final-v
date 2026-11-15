@@ -116,15 +116,21 @@ export async function attachSkin(avatar, role, {height = TARGET_HEIGHT} = {}) {
   const crouchDip = {v: 0};
   const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qp = new THREE.Quaternion(), vtmp = new THREE.Vector3(), vtmp2 = new THREE.Vector3();
   const UP = new THREE.Vector3(0, 1, 0), SIDE = new THREE.Vector3(1, 0, 0);
+  const turned = new WeakMap();
   function turnBone(b, yaw, pitch) {
     if (!b?.parent) return;
+    // If the animation did not rewrite this bone since our last turn, undo that turn first so it never stacks up frame after frame (the shaking head).
+    const st = turned.get(b);
+    if (st && b.quaternion.equals(st.out)) b.quaternion.copy(st.base);
+    const base = b.quaternion.clone();
     b.parent.getWorldQuaternion(qp);
     avatar.group.getWorldQuaternion(qb);
     // Rotate about the avatar's up axis, then about its side axis, expressed in the bone's parent space.
     qa.setFromAxisAngle(vtmp.copy(UP).applyQuaternion(qb), yaw).multiply(qb.clone().multiply(new THREE.Quaternion().setFromAxisAngle(SIDE, pitch)).multiply(qb.clone().invert()));
     b.quaternion.premultiply(qp.clone().invert().multiply(qa).multiply(qp));
+    turned.set(b, {base, out: b.quaternion.clone()});
   }
-  skin.setLook = (yaw = 0, pitch = 0) => { look.tYaw = Math.max(-1.05, Math.min(1.05, yaw)); look.tPitch = Math.max(-0.5, Math.min(0.5, pitch)); };
+  skin.setLook = (yaw = 0, pitch = 0) => { if (!Number.isFinite(yaw)) yaw = 0; if (!Number.isFinite(pitch)) pitch = 0; look.tYaw = Math.max(-1.05, Math.min(1.05, yaw)); look.tPitch = Math.max(-0.5, Math.min(0.5, pitch)); };
   skin.socket = socket;
   skin.handWorld = (target = new THREE.Vector3()) => (palm ? palm.getWorldPosition(target) : avatar.group.localToWorld(target.set(-0.35, 1.2, 0.35)));
   skin.handWorldL = (target = new THREE.Vector3()) => (palmL ? palmL.getWorldPosition(target) : avatar.group.localToWorld(target.set(0.35, 1.2, 0.35)));
@@ -137,6 +143,7 @@ export async function attachSkin(avatar, role, {height = TARGET_HEIGHT} = {}) {
     holder.scale.y = 1 - crouchDip.v * 0.24; holder.position.y = -crouchDip.v * 0.05;
     // Head turns toward where the crew member is moving or looking, split between neck and head.
     const k = 1 - Math.exp(-9 * Math.max(0, dt || 0));
+    if (!Number.isFinite(look.yaw)) look.yaw = 0; if (!Number.isFinite(look.pitch)) look.pitch = 0;
     look.yaw += (look.tYaw - look.yaw) * k; look.pitch += (look.tPitch - look.pitch) * k;
     if (Math.abs(look.yaw) > 1e-3 || Math.abs(look.pitch) > 1e-3) {
       holder.updateMatrixWorld(true);
