@@ -2,6 +2,10 @@ import {getPreferences} from './preferences.js';
 import * as THREE from './vendor/three.module.js';
 import {loadShipInterior,loadGLB} from './asset-loader.js';
 import {createWalker,stepWalker,roomAt,cameraNavFraction,EYE_HEIGHT} from './ship-walk-core.js';
+import {dressShip} from './campaign-dressing.js';
+import {createCampaignCrew} from './campaign-crew.js';
+import {attachSkin} from './characters.js';
+import {stateFor} from './locomotion.js';
 
 // A campaign owns its renderer and input lifecycle. Existing competitive state stays suspended.
 export async function createCampaignWorld(canvas, callbacks={}) {
@@ -9,17 +13,20 @@ export async function createCampaignWorld(canvas, callbacks={}) {
   fetch('./assets/ship/ship_nav.json').then(r=>{if(!r.ok)throw Error('Navigation data unavailable');return r.json();}),
   fetch('./assets/ship/ship_interior.scene.json').then(r=>{if(!r.ok)throw Error('Ship layout unavailable');return r.json();}),loadShipInterior()
  ]);
- const renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
+ const renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
  const scene=new THREE.Scene();scene.background=new THREE.Color('#081321');
  const camera=new THREE.PerspectiveCamera(70,1,.05,2000);
- scene.add(new THREE.HemisphereLight('#e1f7ff','#354054',2));
- const sun=new THREE.DirectionalLight('#fff0cf',2.5);sun.position.set(-20,35,-30);sun.target.position.set(0,1,15);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+ scene.add(new THREE.HemisphereLight('#e1f7ff','#354054',0.85));
+ const sun=new THREE.DirectionalLight('#fff0cf',0.9);sun.position.set(-20,35,-30);sun.target.position.set(0,1,15);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
  Object.assign(sun.shadow.camera,{left:-26,right:26,top:26,bottom:-26,near:.5,far:130});sun.shadow.normalBias=.012;scene.add(sun,sun.target);
  const interior=new THREE.Group();scene.add(interior);interior.add(gltf.scene.clone(true));interior.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=true;}});
- // Bright, local lights make the existing rooms readable without replacing the source art.
- for(const room of layout.modules){const light=new THREE.PointLight('#a8fff0',13,8,1.5);light.position.set(room.center[0],2.6,room.center[2]);interior.add(light);}
+ // Source walls are pure white; tint per-instance copies to a cabin grey so lights shape the room instead of washing it out.
+ interior.traverse(o=>{if(o.isMesh&&o.material){o.material=[o.material].flat().map(m=>{const c=m.clone();if(c.color)c.color.multiplyScalar(.62);return c;});if(o.material.length===1)o.material=o.material[0];}});
+ // Each module is dressed as a working room (deck, ribs, ceiling lights, furniture, hatch frames, signs) with its own
+ // balanced lighting, instead of one over-bright light in an empty box.
  const ownedGeometries=[],ownedMaterials=[];
+ dressShip(interior,layout,{owned:ownedGeometries,ownedMaterials});
  function box(parent,size,pos,color){const g=new THREE.BoxGeometry(...size),m=new THREE.MeshStandardMaterial({color,roughness:.7});ownedGeometries.push(g);ownedMaterials.push(m);const mesh=new THREE.Mesh(g,m);mesh.position.set(...pos);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;}
  const avatar=new THREE.Group();scene.add(avatar);
  const avatarLegs=[],avatarArms=[];
@@ -33,8 +40,14 @@ export async function createCampaignWorld(canvas, callbacks={}) {
   box(hip,[.18,.48,.2],[0,-.24,0],'#e6ede8');avatarLegs.push(hip);
  }
  avatar.visible=false;
+ // Player wears the same rigged crew character as everywhere else (Finn the frog); boxes stay as the loading fallback.
+ const avatarBody=new THREE.Group();for(const c of [...avatar.children])if(c!==footShadow)avatarBody.add(c);avatar.add(avatarBody);
+ const avatarRig={group:avatar,body:avatarBody};attachSkin(avatarRig,0,{height:1.9}).catch(()=>{});
+ let crouch=false;
  const stations={};
  for(const room of layout.modules){const node=new THREE.Group();node.position.set(room.center[0]+.9,0,room.zmin+1.1);interior.add(node);box(node,[.45,.8,.4],[0,.4,0],'#263a48');const screen=box(node,[.39,.23,.04],[0,.82,-.2],'#4ee5c1');screen.material.emissive.set('#4ee5c1');screen.material.emissiveIntensity=.5;stations[room.name]=node;}
+ // Role bots share the cabin: they walk between their room consoles and pick up faults and preparation work.
+ const crew=createCampaignCrew(interior,layout,{getState:()=>callbacks.getState?.(),crewAct:(id,who)=>callbacks.crewAct?.(id,who),playerPosition:()=>({x:walker.x,z:walker.z})});
  // Starfield, Earth, ship airlock and a serviceable generic telescope for the EVA mission.
  const exterior=new THREE.Group();scene.add(exterior);exterior.visible=false;
  const earthGeo=new THREE.IcosahedronGeometry(130,3),earthMat=new THREE.MeshStandardMaterial({color:'#286baf',roughness:1,flatShading:true});ownedGeometries.push(earthGeo);ownedMaterials.push(earthMat);const earth=new THREE.Mesh(earthGeo,earthMat);earth.position.set(0,-190,-110);scene.add(earth);
@@ -52,7 +65,7 @@ export async function createCampaignWorld(canvas, callbacks={}) {
  let walker=createWalker(nav,layout,'cockpit'),eva=false,first=false,paused=false,lastRoom='',dragging=false,near=false,walkPhase=0,walkDistance=0,prevWalk={x:walker.x,z:walker.z},walkSpeed=0;
  const float={x:0,y:0,z:-5};const keys=new Set();
  const resize=()=>{renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();};resize();addEventListener('resize',resize);
- function key(e,down){if(callbacks.isBlocked?.())return;const k=e.key.toLowerCase();if(['input','select','textarea','button'].includes(document.activeElement?.tagName?.toLowerCase())&&k!=='escape')return;if(['w','a','s','d','shift',' ','control','arrowleft','arrowright'].includes(k)){e.preventDefault();if(down)keys.add(k);else keys.delete(k);}if(down&&!e.repeat&&k==='e')callbacks.interact?.();if(down&&!e.repeat&&k==='v')first=!first;}
+ function key(e,down){if(callbacks.isBlocked?.())return;const k=e.key.toLowerCase();if(['input','select','textarea','button'].includes(document.activeElement?.tagName?.toLowerCase())&&k!=='escape')return;if(['w','a','s','d','shift',' ','control','arrowleft','arrowright'].includes(k)){e.preventDefault();if(down)keys.add(k);else keys.delete(k);}if(down&&!e.repeat&&k==='e')callbacks.interact?.();if(down&&!e.repeat&&k==='v')first=!first;if(down&&!e.repeat&&k==='c')crouch=!crouch;}
  const kd=e=>key(e,true),ku=e=>key(e,false);addEventListener('keydown',kd,true);addEventListener('keyup',ku,true);
  const mouse=e=>{if(paused||callbacks.isBlocked?.()||document.pointerLockElement!==canvas&&!dragging)return;walker.yaw-=e.movementX*.0025*getPreferences().sensitivity;walker.pitch=Math.max(-1.1,Math.min(1.1,walker.pitch-e.movementY*.0025*getPreferences().sensitivity*(getPreferences().invertY?-1:1)));};
  const down=()=>{if(paused||callbacks.isBlocked?.())return;dragging=true;canvas.focus();try{canvas.requestPointerLock?.()?.catch?.(()=>{});}catch{}};
@@ -65,7 +78,7 @@ export async function createCampaignWorld(canvas, callbacks={}) {
    if(eva){const speed=keys.has('shift')?3.4:2.1;float.x+=(Math.sin(walker.yaw)*forward-Math.cos(walker.yaw)*strafe)*speed*dt;float.z+=(Math.cos(walker.yaw)*forward+Math.sin(walker.yaw)*strafe)*speed*dt;float.y+=((keys.has(' ')?1:0)-(keys.has('control')?1:0))*speed*dt;const delta=new THREE.Vector3(float.x,float.y,float.z+5);if(delta.length()>16){delta.setLength(16);float.x=delta.x;float.y=delta.y;float.z=delta.z-5;}}
    else {
     // Immediate stop on key release; no phantom movement after browser focus changes.
-    stepWalker(walker,nav,dt,{forward,strafe,run:keys.has('shift')});
+    stepWalker(walker,nav,dt,{forward:crouch?forward*.55:forward,strafe:crouch?strafe*.55:strafe,run:keys.has('shift')&&!crouch});
    }
   }
   const p=eva?new THREE.Vector3(float.x,float.y,float.z):new THREE.Vector3(walker.x,0,walker.z);
@@ -78,10 +91,12 @@ export async function createCampaignWorld(canvas, callbacks={}) {
   const weight=eva?0:Math.min(1,walkSpeed/2.8);
   avatarLegs.forEach((leg,i)=>leg.rotation.x=Math.sin(walkPhase+i*Math.PI)*.30*weight);
   avatarArms.forEach((arm,i)=>arm.rotation.x=Math.sin(walkPhase+i*Math.PI)*-.22*weight);
+  if(avatarRig.skin){const sk=avatarRig.skin;sk.setState(eva?'idle':stateFor(walkSpeed*1.6,{crouch}),walkSpeed*1.6);sk.mixer.update(dt);sk.ground?.(dt,{grounded:!eva,speed:walkSpeed,floorAt:()=>0});sk.setLook?.(0,first?0:-walker.pitch*.6);}
+  if(!eva)crew.tick(dt,camera);
   footShadow.visible=!eva;
   footShadow.material.opacity=.23*(1-.22*weight);
-  const eye=p.clone().add(new THREE.Vector3(0,EYE_HEIGHT,0));const offset=first?0:eva?3:1.05;
-  const targetCamera=eye.clone().addScaledVector(dir,-offset);targetCamera.y+=first?0:.25;
+  const eye=p.clone().add(new THREE.Vector3(0,crouch&&!eva?EYE_HEIGHT-.6:EYE_HEIGHT,0));const offset=first?0:eva?3:crouch?1.9:2.4;
+  const targetCamera=eye.clone().addScaledVector(dir,-offset);targetCamera.y+=first?0:.42;
   if(!eva&&!first){
     const t=cameraNavFraction(nav,walker.x,walker.z,targetCamera.x,targetCamera.z);
     targetCamera.lerpVectors(eye,targetCamera,t);
@@ -100,5 +115,5 @@ export async function createCampaignWorld(canvas, callbacks={}) {
   callbacks.onContext?.(context());renderer.render(scene,camera);
  }
  function setEVA(value){if(value===eva)return;eva=value;interior.visible=!eva;exterior.visible=eva;lastRoom='';if(eva){float.x=0;float.y=0;float.z=-5;walker.yaw=Math.PI;walker.pitch=0;}else walker=createWalker(nav,layout,'airlock');prevWalk={x:walker.x,z:walker.z};walkSpeed=0;walkPhase=0;clear();}
- return {tick,context,setEVA,get eva(){return eva;},setPaused(value){paused=value;if(value){clear();if(document.pointerLockElement===canvas)document.exitPointerLock?.();}},get room(){return context().room;},get position(){return eva?{...float}:{x:walker.x,z:walker.z};},setPosition(p){if(eva)Object.assign(float,p);else Object.assign(walker,p);prevWalk={x:walker.x,z:walker.z};walkSpeed=0;},dispose(){disposed=true;clear();removeEventListener('resize',resize);removeEventListener('keydown',kd,true);removeEventListener('keyup',ku,true);removeEventListener('mouseup',up);removeEventListener('mousemove',mouse);removeEventListener('blur',clear);canvas.removeEventListener('mousedown',down);if(document.pointerLockElement===canvas)document.exitPointerLock?.();ownedGeometries.forEach(g=>g.dispose());ownedMaterials.forEach(m=>m.dispose());renderer.dispose();}};
+ return {tick,context,setEVA,get crew(){return crew;},get crouch(){return crouch;},get eva(){return eva;},setPaused(value){paused=value;if(value){clear();if(document.pointerLockElement===canvas)document.exitPointerLock?.();}},get room(){return context().room;},get position(){return eva?{...float}:{x:walker.x,z:walker.z};},setPosition(p){if(eva)Object.assign(float,p);else Object.assign(walker,p);prevWalk={x:walker.x,z:walker.z};walkSpeed=0;},dispose(){disposed=true;clear();crew.dispose();avatarRig.skin?.dispose();removeEventListener('resize',resize);removeEventListener('keydown',kd,true);removeEventListener('keyup',ku,true);removeEventListener('mouseup',up);removeEventListener('mousemove',mouse);removeEventListener('blur',clear);canvas.removeEventListener('mousedown',down);if(document.pointerLockElement===canvas)document.exitPointerLock?.();ownedGeometries.forEach(g=>g.dispose());ownedMaterials.forEach(m=>m.dispose());renderer.dispose();}};
 }

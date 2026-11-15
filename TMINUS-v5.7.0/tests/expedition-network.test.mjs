@@ -131,7 +131,8 @@ test("16 specialist seats complete shared construction, supplies, checks, travel
     assert.equal(f.state, "carried");
     assert.equal(p.carry, f.id);
     at(p, { x: 0, z: -17 });
-    assert.ok(action(m, p, { op: "load" }).ok);
+    step(m, 2); // walking into the ship area stows the flag automatically
+    assert.equal(f.state, "onboard");
     assert.equal(m.science.teams[team].delivered, 0);
     const pilot = players(m).find((p) => p.team === team && p.role === 0);
     assert.ok(action(m, pilot, { op: "return" }).ok);
@@ -340,7 +341,8 @@ test("recovered samples are reflected in the replicated carrier and can immediat
   assert.ok(action(m, p, { op: "recover", sample: f.id }).ok);
   assert.equal(p.carry, f.id);
   assert.equal(m.snapshot().players.find((q) => q.id === p.id).carry, f.id);
-  at(p, { x: 0, z: -17 });
+  // Manual stowing still works at the aft ring when a crew member arrives outside the auto-stow radius.
+  at(p, { x: 0, z: -21.3 });
   assert.ok(action(m, p, { op: "load" }).ok);
   assert.equal(f.state, "onboard");
   assert.equal(m.science.teams[0].delivered, 0);

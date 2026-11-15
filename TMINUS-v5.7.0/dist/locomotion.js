@@ -27,9 +27,10 @@ export function stateFor(speed, {carrying = 'none', crouch = false, interacting=
   if(airborne)return 'jump';
   if(interacting&&speed<.6)return 'work';
   const c = carryKind(carrying);
-  if (speed < 0.3) return crouch ? 'crouchIdle' : c === 'heavy' ? 'carryIdle' : 'idle';
+  if (speed < 0.3) return crouch ? 'crouchIdle' : c === 'heavy' ? 'carryIdle' : c === 'light' ? 'carrySmallIdle' : 'idle';
   if (c === 'heavy') return 'carryWalk';
   if (crouch) return 'crouchWalk';
+  if (c === 'light') return 'carrySmallWalk';     // flags and small tools: held in front, never hidden behind a run cycle
   if (speed < 4.4) return 'walk';
   if (speed < 7.5) return 'run';
   return 'sprint';
@@ -38,16 +39,19 @@ export function stateFor(speed, {carrying = 'none', crouch = false, interacting=
 // Clip names inside the character files. The frog, bee and flamingo share one set; the robot has fewer.
 export const CLIPS = {
   animal: {idle: 'UAL_Idle_Loop', walk: 'UAL_Walk_Loop', run: 'Run', sprint: 'UAL_Sprint_Loop', carryIdle: 'Carry_Large_Idle',
-    carryWalk: 'Carry_Large_Walk', crouchIdle: 'UAL_Crouch_Idle_Loop', crouchWalk: 'UAL_Crouch_Fwd_Loop',work:'Use_Tool_Loop',jump:'UAL_Jump_Loop'},
-  robot: {idle: 'Robot_Idle', walk: 'Robot_Running', run: 'Robot_Running', sprint: 'Robot_Running', carryIdle: 'Robot_Idle',
-    carryWalk: 'Robot_Running', crouchIdle: 'Robot_Idle', crouchWalk: 'Robot_Running',work:'Robot_IdleHH',jump:'Robot_Jump'}
+    carryWalk: 'Carry_Large_Walk', crouchIdle: 'UAL_Crouch_Idle_Loop', crouchWalk: 'UAL_Crouch_Fwd_Loop',work:'Use_Tool_Loop',jump:'UAL_Jump_Loop',
+    carrySmallIdle: 'Carry_Small_Idle', carrySmallWalk: 'Carry_Small_Walk', pickup: 'UAL_PickUp_Table', seated: 'Seated_Hands_Controls', celebrate: 'Celebrate'},
+  // Chip has a real walk cycle (Robot_Walking); carrying and crouching reuse it at a slower pace.
+  robot: {idle: 'Robot_Idle', walk: 'Robot_Walking', run: 'Robot_Running', sprint: 'Robot_Running', carryIdle: 'Robot_Idle',
+    carryWalk: 'Robot_Walking', crouchIdle: 'Robot_Idle', crouchWalk: 'Robot_Walking',work:'Robot_Punch',jump:'Robot_Jump',
+    carrySmallIdle: 'Robot_Idle', carrySmallWalk: 'Robot_Walking', pickup: 'Robot_Punch', seated: 'Robot_Sitting', celebrate: 'Robot_ThumbsUp'}
 };
 export const clipFor = (species, state) => (species === 'robot' ? CLIPS.robot : CLIPS.animal)[state];
 
 // The robot only has a run clip, so walk and sprint are the same clip played slower and faster.
-const ROBOT_RATE = {walk: 0.5, run: 1, sprint: 1.5, carryWalk: 0.65, crouchWalk: 0.55};
+const ROBOT_RATE = {walk: 0.95, run: 1, sprint: 1.5, carryWalk: 0.8, crouchWalk: 0.7, carrySmallWalk: 0.9, work: 0.7};
 // Ground speed each animal clip looks right at; feet slide less when the playback rate follows the real speed.
-const REF = {walk: SPEED.walk, run: SPEED.run, sprint: SPEED.sprint, carryWalk: SPEED.walk, crouchWalk: SPEED.crouch};
+const REF = {walk: SPEED.walk, run: SPEED.run, sprint: SPEED.sprint, carryWalk: SPEED.walk, crouchWalk: SPEED.crouch, carrySmallWalk: SPEED.walk};
 export function timeScaleFor(species, state, speed) {
   if (species === 'robot') return ROBOT_RATE[state] ?? 1;
   const ref = REF[state];

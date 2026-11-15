@@ -6,8 +6,9 @@ import {getPreferences,observePreferences,mountPreferences} from './preferences.
 import {EVA} from './spacewalk-core.js';
 // Network expedition client. Sends intentions; displays authoritative shared mission models.
 import * as THREE from "./vendor/three.module.js";
-import { FACTIONS, FLAG_SITES, UPGRADES } from "./science-match.js";
+import { FACTIONS, FLAG_SITES, UPGRADES, scanFraction } from "./science-match.js";
 import { createPartModel } from "./part-model.js";
+import { createFlagModel, createEquipmentCrate, createHeldWeapon, holdPoint, placeAtWorld } from "./held-items.js";
 import {
   createExpedition,
   routeBudget,
@@ -110,6 +111,76 @@ let scene,
   stars,
   clock = new THREE.Clock(),
   marker;
+const stowFlights = [], bursts = [];
+let stowPulse = 0, crashShake = 0;
+const tmpHold = new THREE.Vector3();
+// Short-lived particle burst for stows, crashes and pick-ups.
+function burst(at, color = "#ffffff", count = 14, size = 0.16, spread = 5) {
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), new THREE.MeshBasicMaterial({ color, transparent: true }));
+    m.position.copy(at);
+    const a = Math.random() * Math.PI * 2, e = Math.random() * 0.9 + 0.2;
+    m.userData.v = new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).multiplyScalar(spread * (0.4 + Math.random()));
+    m.userData.life = 0.8 + Math.random() * 0.4;
+    scene.add(m); bursts.push(m);
+  }
+}
+function tickBursts(dt) {
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const m = bursts[i];
+    m.userData.life -= dt;
+    m.userData.v.y -= dt * 6;
+    m.position.addScaledVector(m.userData.v, dt);
+    m.material.opacity = Math.max(0, m.userData.life);
+    if (m.userData.life <= 0) { m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); bursts.splice(i, 1); }
+  }
+}
+let cine = null, cineLastPhase = "";
+// Cinematic overlay (DOM) shared by take-off and landing.
+function cineBanner() {
+  let el = document.getElementById("cine-banner");
+  if (!el) {
+    el = document.createElement("div"); el.id = "cine-banner"; el.className = "cine-banner"; el.hidden = true;
+    el.innerHTML = '<small></small><b></b><span></span><i><em></em></i>';
+    document.body.append(el);
+  }
+  return el;
+}
+function startCine(type, planet, title, detail) {
+  cine = { type, planet, t: 0, dur: type === "takeoff" ? 4.6 : 3.6, title };
+  const el = cineBanner();
+  el.querySelector("small").textContent = type === "takeoff" ? "IGNITION" : "DESCENT";
+  el.querySelector("b").textContent = title;
+  el.querySelector("span").textContent = detail;
+  el.hidden = false;
+  document.body.classList.add("cine-active");
+}
+function endCine() { cine = null; cineBanner().hidden = true; document.body.classList.remove("cine-active"); }
+function cineAltitude() {
+  if (!cine) return 0;
+  const k = Math.min(1, cine.t / cine.dur);
+  if (cine.type === "takeoff") { const lift = Math.max(0, k - 0.18) / 0.82; return lift * lift * 70; }
+  const d = 1 - k; return d * d * 55;
+}
+function crashFlash(damage, hull) {
+  let el = document.getElementById("crash-flash");
+  if (!el) { el = document.createElement("div"); el.id = "crash-flash"; el.className = "crash-flash"; document.body.append(el); }
+  el.innerHTML = `<b>IMPACT</b><span>−${damage}% HULL · ${hull}% LEFT</span>`;
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+}
+// Rocky obstacle with jittered faces; reads as solid debris rather than a smooth ball.
+function makeAsteroid(seed) {
+  const geo = new THREE.IcosahedronGeometry(2.2, 1), pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const n = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453, j = 0.78 + (n - Math.floor(n)) * 0.42;
+    pos.setXYZ(i, pos.getX(i) * j, pos.getY(i) * j, pos.getZ(i) * j);
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: "#8f7f70", flatShading: true }));
+  const warn = new THREE.Mesh(new THREE.RingGeometry(2.8, 3.1, 32), new THREE.MeshBasicMaterial({ color: "#ff6a4d", transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+  warn.rotation.x = -Math.PI / 2; warn.position.y = -2.4; m.add(warn);
+  return m;
+}
 const avatars = new Map(),
   ships = [],
   samples = [],
@@ -212,8 +283,7 @@ function makeLabel(text, color) {
   c.textAlign = "center";
   c.fillText(text.slice(0, 23), 128, 35);
   c.fillStyle = color;
-  c.font = "600 12px sans-serif";
-  c.fillText("LIVE CREW", 128, 55);
+  c.fillRect(5, 60, 246, 5);
   const texture = new THREE.CanvasTexture(cvs);
   const material = new THREE.SpriteMaterial({
     map: texture,
@@ -221,8 +291,8 @@ function makeLabel(text, color) {
     depthWrite: false,
   });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.8, 1.12, 1);
-  sprite.position.y = 3.05;
+  sprite.scale.set(2.3, 0.65, 1);
+  sprite.position.y = 3.0;
   return sprite;
 }
 function makeAvatar(p) {
@@ -319,6 +389,7 @@ function makeAvatar(p) {
     animation: 0,
     role: p.role,
     team: p.team,
+    weapon: createHeldWeapon(),
   };
   attachSkin(avatar, p.role).catch(() => {});
   return avatar;
@@ -596,6 +667,81 @@ const sharedHelpers = {
       z,
     ),
 };
+// Flight cabin: a walkable deck the size of the logic interior (x ±6, z ±8.5) with real room dressing.
+// Engineer and Raider walk it; Pilot and Gunner sit at the helm and turret consoles at the bow.
+function stationLabel(text, color) {
+  const cvs = document.createElement("canvas");
+  cvs.width = 256; cvs.height = 64;
+  const c = cvs.getContext("2d");
+  c.fillStyle = "rgba(6,12,24,.92)"; c.fillRect(0, 0, 256, 64);
+  c.fillStyle = color; c.fillRect(0, 0, 8, 64);
+  c.fillStyle = "#f4f8ff"; c.font = "700 30px sans-serif"; c.textAlign = "center"; c.fillText(text, 134, 43);
+  const tex = new THREE.CanvasTexture(cvs);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.castShadow = false;
+  return m;
+}
+function glowBox(parent, x, y, z, w, h, d, color, intensity = 0.9) {
+  return obj(parent, new THREE.BoxGeometry(w, h, d), mat(color, intensity), x, y, z);
+}
+function buildCabin(interior, team) {
+  const accent = COLORS[team];
+  // Deck, kick plates and a centre walkway stripe.
+  box(interior, 0, -0.15, 0, 12, 0.3, 17.4, "#2e3146");
+  box(interior, 0, 0.005, 0, 2.2, 0.02, 15.6, "#3c4260");
+  for (let z = -7; z <= 7; z += 2) box(interior, 0, 0.012, z, 2.4, 0.02, 0.08, accent);
+  // Side walls with window bands (stars outside) and handrails.
+  for (const sign of [-1, 1]) {
+    box(interior, sign * 6.05, 1.6, 0, 0.18, 3.2, 17.4, "#4c5170");
+    glowBox(interior, sign * 5.94, 2.05, 0, 0.04, 0.55, 12, "#0d1b3d", 0.5);
+    box(interior, sign * 5.85, 1.05, 0, 0.08, 0.08, 15, "#b9c3d6");
+    for (let z = -6; z <= 6; z += 3) box(interior, sign * 5.95, 1.6, z, 0.12, 3.2, 0.25, "#5c6283");
+  }
+  // Bow and stern bulkheads; bow has the forward canopy.
+  box(interior, 0, 1.6, -8.75, 12, 3.2, 0.2, "#4c5170");
+  glowBox(interior, 0, 2.0, -8.62, 7, 1.0, 0.04, "#14306a", 0.6);
+  box(interior, 0, 1.6, 8.75, 12, 3.2, 0.2, "#4c5170");
+  // Ceiling beams and light strips so the room never reads as a floating box.
+  box(interior, 0, 3.25, 0, 12, 0.12, 17.4, "#252838");
+  for (let z = -7.5; z <= 7.5; z += 2.5) { box(interior, 0, 3.12, z, 12, 0.16, 0.22, "#575d7d"); glowBox(interior, 0, 3.02, z, 3.4, 0.04, 0.12, "#dff4ff", 1.2); }
+  const light = new THREE.PointLight("#cfe8ff", 9, 16, 1.6); light.position.set(0, 2.8, 0); interior.add(light);
+  const light2 = new THREE.PointLight(accent, 4, 10, 1.6); light2.position.set(0, 2.6, -6.5); interior.add(light2);
+  // Engineering stations (server colliders: 2.2 x 1.3 boxes).
+  const names = { reactor: "REACTOR", coolant: "COOLANT", scrubber: "LIFE SUPPORT", stores: "STORES" };
+  const stationViews = {};
+  for (const c of SYSTEM_STATIONS) {
+    const st = new THREE.Group(); st.position.set(c.x, 0, c.z); interior.add(st);
+    box(st, 0, 0.5, 0, 2.2, 1.0, 1.3, "#5a5f7a");
+    box(st, 0, 1.02, 0, 2.3, 0.06, 1.4, "#8a91ad");
+    const face = Math.sign(-c.x) || 1;      // screens face the walkway
+    const screen = glowBox(st, face * 0.2, 1.45, 0, 0.06, 0.6, 1.1, "#2fd1b8", 0.8);
+    screen.rotation.z = face * 0.35;
+    const lamp = glowBox(st, -face * 0.85, 1.25, 0.5, 0.18, 0.18, 0.18, "#5dff9a", 1.2);
+    const label = stationLabel(names[c.id], accent); label.position.set(0, 2.25, 0); label.rotation.y = face > 0 ? Math.PI / 2 : -Math.PI / 2; st.add(label);
+    stationViews[c.id] = { st, screen, lamp };
+  }
+  // Helm (Pilot) and turret (Gunner) consoles at the bow, with seats at the crew spawn points.
+  const seats = {};
+  for (const [role, x, text] of [[0, -1.8, "HELM"], [2, 1.8, "TURRET"]]) {
+    const st = new THREE.Group(); st.position.set(x, 0, -7.3); interior.add(st);
+    box(st, 0, 0.55, 0, 2.0, 1.1, 0.9, "#5a5f7a");
+    const scr = glowBox(st, 0, 1.35, 0.15, 1.6, 0.55, 0.05, role === 0 ? "#6fb2ff" : "#ff9b6a", 0.9); scr.rotation.x = -0.45;
+    const label = stationLabel(text, accent); label.position.set(0, 2.25, 0); st.add(label);
+    const seat = new THREE.Group(); seat.position.set(x, 0, -5.5); interior.add(seat);
+    box(seat, 0, 0.45, 0, 0.8, 0.12, 0.8, "#2b2f42");
+    box(seat, 0, 0.95, 0.38, 0.8, 0.9, 0.12, "#2b2f42");
+    box(seat, 0, 0.22, 0, 0.18, 0.44, 0.18, "#8a91ad");
+    seats[role] = seat;
+  }
+  // Airlock hatch on the starboard stern (Raider EVA), cargo racks to port.
+  const lock = new THREE.Group(); lock.position.set(5.85, 0, 6.2); interior.add(lock);
+  box(lock, 0, 1.25, 0, 0.2, 2.5, 1.6, "#7d86a6");
+  glowBox(lock, -0.12, 1.25, 0, 0.04, 2.1, 1.2, "#ffb347", 0.35);
+  const lockLabel = stationLabel("AIRLOCK", accent); lockLabel.position.set(-0.2, 2.75, 0); lockLabel.rotation.y = -Math.PI / 2; lock.add(lockLabel);
+  for (const z of [5.2, 6.4, 7.6]) { box(interior, -5.1, 0.35, z, 1.2, 0.7, 0.9, "#8b6f6c"); box(interior, -5.1, 0.72, z, 1.25, 0.05, 0.95, accent); }
+  interior.userData.stations = stationViews;
+  interior.userData.seats = seats;
+}
 function makeShip(team) {
   const b = baseFor(team),
     g = new THREE.Group();
@@ -634,8 +780,11 @@ function makeShip(team) {
     marker.rotation.y = (part.angle * Math.PI) / 2;
     marker.position.set(part.position[0], 0.07, part.position[2]);
     outline.add(marker);
-    const held = createPartModel(sharedHelpers, models[team], part, carry);
-    held.scale.setScalar(0.27);
+    // Carried modules travel in a two-hand equipment crate with a fitted miniature, sized to the carry pose.
+    const scratch = new THREE.Group();
+    const mini = createPartModel(sharedHelpers, models[team], part, scratch);
+    mini.removeFromParent();
+    carry.add(createEquipmentCrate(COLORS[team], mini, { label: part.name.split(" ")[0] }));
     const bolts = [0, 1, 2].map((i) => {
       const [x, y, z] = boltPosition(part, i);
       return ball(g, x, y, z, 0.17, COLORS[team]);
@@ -643,16 +792,9 @@ function makeShip(team) {
     return { id: part.id, shelf, outline, carry, bolts };
   });
   const cargo = models[team].cargo.map((c) => {
-    const o = box(
-      g,
-      c.position[0],
-      0.45,
-      c.position[2],
-      0.9,
-      0.9,
-      0.8,
-      "#d6b08a",
-    );
+    const o = createEquipmentCrate("#d6b08a", null, { width: 1.15, height: 0.7, depth: 0.7, label: c.name.split(" ")[0] });
+    o.position.set(c.position[0], 0.35, c.position[2]);
+    g.add(o);
     ring(groundFixtures, c.position[0], 0.03, c.position[2], 1.1, COLORS[team]);
     return o;
   });
@@ -671,15 +813,7 @@ function makeShip(team) {
   const load = ring(g, 0, 0.035, -17, 1.7, "#c6e8a9");
   const interior = new THREE.Group();
   g.add(interior);
-  box(interior, 0, -0.15, 0, 12, 0.3, 17, "#34334b");
-  for (const sign of [-1, 1])
-    box(interior, sign * 6, 1.5, 0, 0.2, 3, 17, "#535871");
-  for (const c of SYSTEM_STATIONS) {
-    box(interior, c.x, 0.8, c.z, 2.2, 1.6, 1.3, "#62657b");
-    box(interior, c.x, 1.4, c.z + 0.67, 1.7, 0.45, 0.04, "#9edbd2");
-  }
-  for (const x of [-3, 0, 3])
-    box(interior, x, 0.3, -5.5, 0.75, 0.6, 0.75, "#8b6f6c");
+  buildCabin(interior, team);
   interior.visible = false;
   ships.push({
     team,
@@ -751,25 +885,12 @@ function initWorld() {
     rock.scale.y = 1.4;
     decor.push(rock);
   }
+  // Planet B science flags: planted on a cairn, claimed with a 5 s hold, carried upright in one hand.
   for (const [x, z] of FLAG_SITES) {
-    const g = new THREE.Group();
-    g.position.set(x, 0, z);
-    root.add(g);
-    cylinder(g, 0, 0.25, 0, 0.65, 0.85, 0.5, "#746775", 8);
-    const crystal = obj(
-      g,
-      new THREE.OctahedronGeometry(0.35),
-      new THREE.MeshToonMaterial({
-        color: "#aae8c8",
-        emissive: "#58b8a3",
-        emissiveIntensity: 0.4,
-      }),
-      0,
-      0.95,
-      0,
-    );
-    ring(g, 0, 0.03, 0, 0.9, "#b4e2c2");
-    samples.push({ g, crystal });
+    const flag = createFlagModel();
+    flag.group.position.set(x, 0, z);
+    root.add(flag.group);
+    samples.push({ g: flag.group, flag });
   }
   const positions = [];
   for (let i = 0; i < 900; i++) {
@@ -907,7 +1028,8 @@ function objective() {
     if(p.eva){const panel=s.panels?.filter(q=>q.health<60||q.removed).sort((a,b)=>Math.hypot(p.x-s.shipMotion.x-a.offset[0],p.y+1-1.476-a.offset[1],p.z-s.shipMotion.z-a.offset[2])-Math.hypot(p.x-s.shipMotion.x-b.offset[0],p.y+1-1.476-b.offset[1],p.z-s.shipMotion.z-b.offset[2]))[0];
       if(panel)return {x:s.shipMotion.x+panel.offset[0],y:1.476+panel.offset[1],z:s.shipMotion.z+panel.offset[2],title:panel.removed?'Install '+panel.name:'Remove '+panel.name,detail:`O₂ ${Math.round(p.oxygen)}% · spares ${s.spares} · X at airlock boards`,op:panel.removed?'work':'remove-panel',panel:panel.id,target:{type:'panel',id:panel.id}};
       return {x:s.shipMotion.x+EVA.airlock.x,z:s.shipMotion.z+EVA.airlock.z,y:1.476+EVA.airlock.y,title:'Return to the airlock',detail:`Suit O₂ ${Math.round(p.oxygen)}% · X boards the ship`};}
-    if(p.role===3)return {title:'Raider · cargo and exterior repairs',detail:`X exits the airlock · ${s.panels?.filter(q=>q.health<60).length||0} damaged plates · ${s.spares} spares`};
+    const damagedPlates=s.panels?.filter(q=>q.health<60).length||0;
+    if(p.role===3&&damagedPlates>0)return {...EVA_DOOR,title:`Raider · ${damagedPlates} hull plate${damagedPlates>1?'s':''} damaged`,detail:`Walk to the AIRLOCK · X starts the spacewalk · ${s.spares} spares`,op:null};
     const wreck=latest.flags.find(f=>f.state==='wreck'&&f.planet==='space');
     if(wreck&&p.role===0){const b=spaceBaseFor(p.team);return {x:wreck.position[0]-b.x,z:wreck.position[2]-b.z,title:'Recover exposed cargo',detail:'Fly within 4.5 m and press E · delivery still required',op:'salvage',sample:wreck.id};}
     if (p.role === 0)
@@ -921,12 +1043,12 @@ function objective() {
         title: "Gunner · clear the flight corridor",
         detail: "Aim with mouse · LMB fires the dorsal turret",
       };
-    const sorted = [...SYSTEM_STATIONS].sort((a, b) => d(a) - d(b)),
-      c = sorted[0];
+    // Engineer (and Raider when inside) service whichever system needs it most: faults first, then the worst gauge.
+    const need = shipNeeds(s), c = need.station;
     return {
       ...c,
-      title: "Service " + c.id,
-      detail: `${Math.ceil(d(c))} m · Engineer holds E · hull ${Math.round(s.hull)}%`,
+      title: (need.urgent ? "⚠ " : "") + need.title,
+      detail: `${Math.ceil(d(c))} m · hold E at the ${STATION_NAMES[c.id]} console · ${need.reason}`,
       op: "work",
       target: { type: "system", id: c.id },
     };
@@ -936,8 +1058,8 @@ function objective() {
       return {
         x: 0,
         z: -17,
-        title: "Stow science at the ship",
-        detail: "E at the aft ring · G drops · only delivery scores",
+        title: "Carry the flag to your ship",
+        detail: "Walk into the ship area · it stows automatically · G drops",
         op: "load",
       };
     const b = baseFor(p.team),
@@ -955,19 +1077,19 @@ function objective() {
     const f = available[0];
     if (!f)
       return {
-        title: "Samples secured · return to Planet A",
-        detail: "Pilot: N returns when all carried samples are stowed",
+        title: "All flags claimed · return to Planet A",
+        detail: "Pilot presses N once every carried flag is stowed",
       };
     return {
       x: f.position[0] - b.x,
       z: f.position[2] - b.z,
       title:
         f.state === "site"
-          ? ["Scan", "Stabilize", "Extract"][Math.min(2, f.stage)] +
-            " sample " +
-            (f.id + 1)
-          : "Recover loose sample",
-      detail: `${Math.round(f.progress * 100)}% · ${Math.ceil(Math.hypot(w.x - f.position[0], w.z - f.position[2]))} m · Raider holds E · Pilot N returns`,
+          ? "Claim Science Flag " + (f.id + 1)
+          : "Recover dropped flag " + (f.id + 1),
+      detail: f.state === "site"
+        ? `${Math.round(scanFraction(f) * 100)}% · ${Math.ceil(Math.hypot(w.x - f.position[0], w.z - f.position[2]))} m · hold E for 5 s · any crew`
+        : `${Math.ceil(Math.hypot(w.x - f.position[0], w.z - f.position[2]))} m · press E to pick up`,
       op: f.state === "site" ? "work" : "recover",
       sample: f.id,
       target: { type: "scan", id: String(f.id) },
@@ -984,6 +1106,21 @@ function objective() {
     title: "Crew eliminated",
     detail: "Wait for the other expeditions to finish",
   };
+}
+const STATION_NAMES = { reactor: "REACTOR", coolant: "COOLANT", scrubber: "LIFE SUPPORT", stores: "STORES" };
+const EVA_DOOR = { x: 5, z: 6.2 };
+function shipNeeds(s) {
+  const st = (id) => SYSTEM_STATIONS.find((c) => c.id === id);
+  if (s.fault === "reactor" || s.fault === "power") return { station: st("reactor"), title: "Reactor fault", reason: "power generation is cut", urgent: true };
+  if (s.fault === "cooling") return { station: st("coolant"), title: "Coolant fault", reason: `cabin ${Math.round(s.temperature)}° and rising`, urgent: true };
+  if (s.fault === "scrubber") return { station: st("scrubber"), title: "CO₂ scrubber fault", reason: `CO₂ ${Math.round(s.co2)} ppm`, urgent: true };
+  const options = [
+    { station: st("coolant"), score: (s.temperature - 45) / 40, title: "Cool the cabin", reason: `${Math.round(s.temperature)}°` },
+    { station: st("scrubber"), score: (s.co2 - 900) / 3000, title: "Scrub CO₂", reason: `${Math.round(s.co2)} ppm` },
+    { station: st("reactor"), score: 1 - s.power / Math.max(0.1, s.powerCapacity || 4), title: "Charge the batteries", reason: `${(s.power || 0).toFixed(1)} kWh` },
+    { station: st("stores"), score: (70 - (s.crewNutrition ?? 100)) / 70, title: "Feed the crew", reason: `nutrition ${Math.round(s.crewNutrition ?? 100)}%` },
+  ].sort((a, b) => b.score - a.score);
+  return { ...options[0], urgent: options[0].score > 0.6 };
 }
 function command(data) {
   send({ kind: "action", commandSeq: ++commandSeq, ...data });
@@ -1014,6 +1151,43 @@ function focusObjective() {
   if (!p || !Number.isFinite(o?.x)) return;
   yaw = Math.atan2(o.x - p.x, -(o.z - p.z));
   pitch = 0.1;
+}
+function hudEl(id, cls, parent = $("online-hud")) {
+  let el = document.getElementById(id);
+  if (!el) { el = document.createElement("div"); el.id = id; el.className = cls; parent.append(el); }
+  return el;
+}
+// Always-visible flag tally once the crew can reach Planet B.
+function updateFlagCounter(s, p, m) {
+  const el = hudEl("flag-counter", "flag-counter glass");
+  const show = ["surface", "flight", "delivery"].includes(m.phase) && (m.phase !== "flight" || m.flightLeg === "return" || s.flags.some((f) => f.owner === p.team));
+  el.hidden = !show && m.phase !== "surface";
+  if (el.hidden) return;
+  const mine = s.flags.filter((f) => f.owner === p.team);
+  const carried = mine.filter((f) => f.state === "carried").length, onboard = mine.filter((f) => f.state === "onboard").length, delivered = mine.filter((f) => f.state === "delivered").length;
+  const left = s.flags.filter((f) => ["site", "ground", "wreck"].includes(f.state) && f.planet === "B").length;
+  const html = `<div class="fc-flag" style="--team:${COLORS[p.team]}"></div><div class="fc-main"><small>SCIENCE FLAGS</small><b>${onboard + delivered}<em>/${s.flags.length}</em></b></div><div class="fc-stats"><span><i>${carried}</i>carried</span><span><i>${onboard}</i>aboard</span><span><i>${delivered}</i>delivered</span><span><i>${left}</i>left on B</span></div>`;
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+  el.classList.toggle("pulse", stowPulse > 0);
+}
+// Ship operations board while flying: every role has a visible job and you can see who covers it.
+function updateShipOps(s, p, m) {
+  const el = hudEl("ship-ops", "ship-ops glass");
+  el.hidden = m.phase !== "flight";
+  if (el.hidden) return;
+  const need = shipNeeds(m), plates = m.panels?.filter((q) => q.health < 60).length || 0, hz = m.hazards?.length || 0;
+  const rows = [
+    ["Pilot", "HELM", `Dodge debris · hull ${Math.round(m.hull)}%`, m.hull < 50],
+    ["Engineer", STATION_NAMES[need.station.id], `${need.title} · ${need.reason}`, need.urgent],
+    ["Gunner", "TURRET", hz ? `${hz} obstacle${hz > 1 ? "s" : ""} inbound · shoot them` : "Corridor clear", hz > 1],
+    ["Raider", plates ? "AIRLOCK" : STATION_NAMES[need.station.id], plates ? `${plates} plate${plates > 1 ? "s" : ""} to replace on EVA` : "Assist the engineer inside", plates > 0],
+  ];
+  const html = `<div class="eyebrow">SHIP OPERATIONS · ${m.flightLeg === "return" ? "RETURN" : "OUTBOUND"} ${Math.round((m.flightTime / Math.max(1, m.route?.duration ? (m.flightLeg === "return" ? Math.max(20, m.route.duration * 0.55) : m.route.duration) : 100)) * 100)}%</div>` +
+    rows.map(([role, where, task, warn], r) => {
+      const q = s.players.find((q) => q.team === p.team && q.role === r);
+      return `<div class="op-row ${warn ? "warn" : ""} ${r === p.role ? "me" : ""}"><b>${role}</b><span class="op-where">${where}</span><span class="op-task">${esc(task)}</span><small>${q ? esc(q.name) + (q.id === id ? " · YOU" : "") : "OPEN · F" + (r + 1) + " to take"}</small></div>`;
+    }).join("");
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
 }
 const htmlCache = new Map();
 function setHTML(id, html) {
@@ -1055,6 +1229,13 @@ function updateHud(s) {
       return `<button data-role="${r}" ${q && q.id !== id ? "disabled" : ""}><b>${esc(q?.name || "TAKE ROLE")}</b><small>F${r + 1} ${role}${q?.id === id ? " · YOU" : ""}</small></button>`;
     }).join(""),
   );
+  document.body.dataset.phase = m.phase;
+  updateFlagCounter(s, p, m);
+  updateShipOps(s, p, m);
+  // The bottom prompt only appears when there is something to do within reach; the top card always holds the goal.
+  const reach = Number.isFinite(o?.x) ? Math.hypot((o.x ?? 0) - p.x, (o.z ?? 0) - p.z) : Infinity;
+  const prompt = document.querySelector(".interaction");
+  if (prompt) prompt.classList.toggle("is-near", !!o?.op && reach <= 6);
   $("action-title").textContent = o?.title || "STANDBY";
   $("action-detail").textContent = o?.detail || "";
   $("player-name").textContent = p.name + " / " + ROLES[p.role];
@@ -1114,10 +1295,24 @@ function networkPhaseKey(s) {
 function updateWorld(s, dt, now) {
   const p = me();
   if (!p) return;
-  const own = s.missions[p.team],
-    planet =
+  const heldQueue = [];
+  tickBursts(dt);
+  stowPulse = Math.max(0, stowPulse - dt);
+  const own = s.missions[p.team];
+  // Take-off and landing cinematics: the ship visibly lifts off or sets down before the scene changes.
+  if (cineLastPhase && cineLastPhase !== own.phase && !own.finished) {
+    const from = cineLastPhase, to = own.phase;
+    if (to === "flight" && from === "surface") startCine("takeoff", "B", "LIFT-OFF FROM PLANET B", `${s.flags.filter((f) => f.state === "onboard" && f.owner === p.team).length} flags aboard · returning to Planet A`);
+    else if (to === "flight" && (from === "route" || from === "outfit")) startCine("takeoff", "A", "LAUNCH", "Clearing the pad · outbound to Planet B");
+    else if (from === "flight" && to === "surface") startCine("landing", "B", "TOUCHDOWN · PLANET B", "Find the science flags · hold E for 5 s to claim");
+    else if (from === "flight" && to === "delivery") startCine("landing", "A", "HOME · PLANET A", "Unload the flags at the receiver");
+  }
+  cineLastPhase = own.phase;
+  if (cine) { cine.t += dt; if (cine.t >= cine.dur) endCine(); }
+  let planet =
       own.phase === "surface" ? "B" : own.phase === "flight" ? "space" : "A",
     base = own.phase==='flight'?spaceBaseFor(p.team):baseFor(p.team);
+  if (cine) { planet = cine.planet; base = baseFor(p.team); }
   const phaseKey =
     p.team + ":" + p.role + ":" + own.phase + ":" + own.flightLeg;
   if (lastPhase !== phaseKey) {
@@ -1140,6 +1335,8 @@ function updateWorld(s, dt, now) {
     const theirPlanet =
       data.phase === "surface" ? "B" : data.phase === "flight" ? "space" : "A";
     const location=data.phase==='flight'?spaceBaseFor(ship.team):baseFor(ship.team);ship.g.position.set(location.x,0,location.z);ship.g.visible=theirPlanet===planet;
+    const cineOwn = cine && ship.team === p.team;
+    if (cineOwn) { const b = baseFor(ship.team); ship.g.position.set(b.x, 0, b.z); ship.g.visible = true; }
     ship.extraGun.visible = data.upgrades.includes("weapons");
     ship.reservePod.visible = data.upgrades.includes("reserve");
     ship.extraRack.visible = data.upgrades.includes("cargo");
@@ -1156,8 +1353,25 @@ function updateWorld(s, dt, now) {
       1.476,
       data.shipMotion.z || 0,
     );
+    // Hull impacts: an obstacle that reaches the ship explodes against it, shakes it and knocks it back.
+    if (data.phase === "flight" && ship.lastHull !== undefined && data.hull < ship.lastHull - 2.5) {
+      const at = new THREE.Vector3(ship.g.position.x + (data.shipMotion.x || 0), 3, ship.g.position.z + (data.shipMotion.z || 0) - 3);
+      burst(at, "#ffb15c", 22, 0.28, 9); burst(at, "#7b6f66", 14, 0.4, 6);
+      ship.wobble = 1;
+      if (ship.team === p.team) { crashShake = 0.9; crashFlash(Math.round(ship.lastHull - data.hull), Math.round(data.hull)); }
+    }
+    ship.lastHull = data.phase === "flight" ? data.hull : undefined;
+    ship.wobble = Math.max(0, (ship.wobble || 0) - dt * 1.6);
+    ship.craft.rotation.z = Math.sin(now / 28) * 0.22 * ship.wobble;
+    ship.craft.rotation.x = Math.sin(now / 41) * 0.12 * ship.wobble;
+    if (cineOwn) {
+      ship.craft.position.set(0, 1.476 + cineAltitude(), 0);
+      ship.craft.visible = true; ship.interior.visible = false;
+      ship.craft.rotation.z = Math.sin(now / 90) * 0.02;
+    }
     for(const item of ship.repairPanels||[]){const panel=data.panels?.find(p=>p.id===item.id);item.frame.visible=data.phase==='flight'&&!!panel;if(panel){item.frame.position.set(data.shipMotion.x+panel.offset[0],1.476+panel.offset[1],data.shipMotion.z+panel.offset[2]);item.plate.visible=!panel.removed;item.plate.material=mat(panel.health<60?'#ce6e6e':'#a4b3bf');}}
-    ship.engineFlames.forEach((f) => (f.visible = planet === "space"));
+    ship.engineFlames.forEach((f) => (f.visible = planet === "space" || (cineOwn && cineAltitude() > 0.05) || (cineOwn && cine.type === "takeoff")));
+    ship.pad.visible = ship.pad.visible || cineOwn;
     ship.craft.children.forEach((o) => {
       const part = model.parts.find((part) => part.id === o.userData.partId);
       if (part)
@@ -1177,6 +1391,7 @@ function updateWorld(s, dt, now) {
       const carrier = s.players.find(
         (q) => q.team === ship.team && q.role === part.owner,
       );
+      if (carrier && v.carry.visible) heldQueue.push({ object: v.carry, playerId: carrier.id, kind: "two" });
       if (carrier) {
         v.carry.position.set(
           carrier.x + Math.sin(carrier.aim) * 0.8,
@@ -1198,13 +1413,14 @@ function updateWorld(s, dt, now) {
         (q) =>
           q.team === ship.team && data.carry[q.role] === "cargo:" + cargo.id,
       );
-      if (carrier)
+      if (carrier) {
         o.position.set(
           carrier.x + Math.sin(carrier.aim) * 0.8,
           1.0,
           carrier.z - Math.cos(carrier.aim) * 0.8,
         );
-      else o.position.set(cargo.position[0], 0.45, cargo.position[2]);
+        if (o.visible) heldQueue.push({ object: o, playerId: carrier.id, kind: "two" });
+      } else { o.position.set(cargo.position[0], 0.35, cargo.position[2]); o.rotation.set(0, 0, 0); }
     });
     ship.checks.forEach((o) => (o.visible = data.phase === "outfit"));
     ship.stow.visible = data.phase === "outfit";
@@ -1215,6 +1431,19 @@ function updateWorld(s, dt, now) {
     const f = s.flags[i],
       v = samples[i];
     v.g.visible = false;
+    const prevState = v.state;
+    v.state = f.state;
+    // Auto-stow: a flag that just went carried -> onboard flies into the hatch.
+    if (prevState === "carried" && f.state === "onboard" && planet === "B" && v.g.visible !== undefined) {
+      const owner = s.missions[f.owner] ? f.owner : p.team;
+      const b = baseFor(owner);
+      stowFlights.push({ v, from: v.g.position.clone(), to: new THREE.Vector3(b.x, 3.2, b.z - 2), t: 0, team: f.owner });
+      if (f.owner === p.team) { stowPulse = 1.2; tell(`FLAG STOWED · ${s.flags.filter((q) => q.state === "onboard" && q.owner === p.team).length} ONBOARD`, "success"); }
+    }
+    if (stowFlights.some((x) => x.v === v)) { v.g.visible = true; continue; }
+    v.flag.setCarried(false);
+    v.flag.setProgress(0);
+    v.g.scale.setScalar(1);
     if (
       planet === "B" &&
       ["site", "ground", "wreck"].includes(f.state) &&
@@ -1222,6 +1451,9 @@ function updateWorld(s, dt, now) {
     ) {
       v.g.visible = true;
       v.g.position.set(f.position[0], 0, f.position[2]);
+      v.g.rotation.set(0, 0, 0);
+      v.flag.setColor(f.scanner !== null && f.scanner !== undefined ? COLORS[f.scanner] : f.state === "site" ? "#f2e7c9" : "#ffb36b");
+      v.flag.setProgress(scanFraction(f));
     } else if (planet === "B" && f.state === "carried") {
       const carrier = s.players.find(
         (q) => q.team === f.owner && q.role === f.carrier,
@@ -1229,29 +1461,53 @@ function updateWorld(s, dt, now) {
       if (carrier) {
         const w = positionFor(carrier);
         v.g.visible = true;
-        v.g.position.set(w.x + 0.6, 0.8, w.z);
+        v.flag.setCarried(true);
+        v.flag.setColor(COLORS[f.owner]);
+        v.g.scale.setScalar(0.62);
+        v.g.position.set(w.x + 0.4, 0.6, w.z);
+        heldQueue.push({ object: v.g, playerId: carrier.id, kind: "flag" });
       }
     } else if (
       f.state === "onboard" &&
-      shipPlanet(s.missions[f.owner]) === planet
+      shipPlanet(s.missions[f.owner]) === planet && planet !== "space"
     ) {
-      const b = s.missions[f.owner].phase==='flight'?spaceBaseFor(f.owner):baseFor(f.owner),
+      // Stowed flags fly from a rack on the ship's flank so the count is visible in the world too.
+      const b = baseFor(f.owner),
         list = s.flags.filter(
           (q) => q.state === "onboard" && q.owner === f.owner,
         ),
         index = list.indexOf(f);
       v.g.visible = true;
+      v.flag.setCarried(true);
+      v.flag.setColor(COLORS[f.owner]);
+      v.g.scale.setScalar(0.55);
       v.g.position.set(
-        b.x + (index % 2 ? 1 : -1) * 4.5,
-        1.3,
-        b.z + 2 + Math.floor(index / 2),
+        b.x + (index % 2 ? 1 : -1) * 4.2,
+        1.2,
+        b.z + 3 + Math.floor(index / 2) * 0.9,
       );
     } else if (f.state === "delivered" && planet === "A") {
       const b = baseFor(f.owner);
       v.g.visible = true;
-      v.g.position.set(b.x + (f.id % 4) * 0.8 - 1.2, 0.3, b.z + 40);
+      v.flag.setCarried(false);
+      v.flag.setColor(COLORS[f.owner]);
+      v.g.position.set(b.x + (f.id % 4) * 1.6 - 2.4, 0, b.z + 40 + Math.floor(f.id / 4) * 1.6);
     }
-    v.crystal.rotation.y += dt;
+    if (v.g.visible) v.flag.update(dt);
+  }
+  for (let i = stowFlights.length - 1; i >= 0; i--) {
+    const fl = stowFlights[i];
+    fl.t += dt / 0.9;
+    const k = Math.min(1, fl.t), arc = Math.sin(k * Math.PI) * 4;
+    fl.v.g.position.lerpVectors(fl.from, fl.to, k);
+    fl.v.g.position.y += arc;
+    fl.v.g.rotation.y += dt * 9;
+    fl.v.g.scale.setScalar(0.62 * (1 - k * 0.7));
+    fl.v.flag.update(dt, 6);
+    if (k >= 1) {
+      stowFlights.splice(i, 1);
+      burst(fl.to, COLORS[fl.team] || "#ffffff");
+    }
   }
   const interpolated = previous
       ? interpolateSnapshots(
@@ -1278,6 +1534,12 @@ function updateWorld(s, dt, now) {
       b = s.missions[q.team].phase==='flight'?spaceBaseFor(q.team):baseFor(q.team);
     a.g.visible =
       q.connected && q.hp > 0 && shipPlanet(s.missions[q.team]) === planet;
+    // In space, crew inside a ship are only drawn for crew who are inside that same cabin; otherwise they
+    // would poke through the hull. Spacewalkers are always drawn.
+    if (planet === "space" && !q.eva) {
+      const viewerInside = !cine && [1, 3].includes(p.role) && !p.eva && q.team === p.team;
+      if (!viewerInside) a.g.visible = false;
+    }
     const moveDist = Math.hypot(
       a.g.position.x - (pos.x + b.x),
       a.g.position.z - (pos.z + b.z),
@@ -1286,19 +1548,46 @@ function updateWorld(s, dt, now) {
     a.g.position.x = THREE.MathUtils.lerp(a.g.position.x, pos.x + b.x, blend);
     a.g.position.z = THREE.MathUtils.lerp(a.g.position.z, pos.z + b.z, blend);
     a.g.position.y = q.y||0;
+    if (s.missions[q.team].phase === "flight" && !q.eva && [0, 2].includes(q.role)) {
+      // Pilot and Gunner sit at the bow consoles facing forward.
+      a.g.position.set(b.x + (q.role === 0 ? -1.8 : 1.8), 0.08, b.z - 5.5);
+    }
     const speed = Math.min(
       8,
       Math.hypot(a.g.position.x - a.last.x, a.g.position.z - a.last.z) /
         Math.max(dt, 0.001),
     );
-    a.g.rotation.y = smoothFacing(a.g.rotation.y, q.aim + Math.PI, dt, 15);
-    a.skin?.setState(
-      stateFor(speed, {
-        carrying: s.missions[q.team].carry[q.role] ? "heavy" : "none",crouch:q.crouch,interacting:q.working,airborne:!q.eva&&(q.y||0)>.03,
-      }),
-      speed,
-    );
+    const mvx = a.g.position.x - a.last.x, mvz = a.g.position.z - a.last.z;
+    a.g.rotation.y = s.missions[q.team].phase === "flight" && !q.eva && [0, 2].includes(q.role)
+      ? Math.PI
+      : smoothFacing(a.g.rotation.y, q.aim + Math.PI, dt, 15);
+    const heldKind = s.missions[q.team].carry[q.role]
+      ? (String(s.missions[q.team].carry[q.role]).startsWith("cargo:") ? "heavy" : "heavy")
+      : q.carry !== null && q.carry !== undefined ? "light" : "none";
+    const seated = s.missions[q.team].phase === "flight" && !q.eva && [0, 2].includes(q.role);
+    let animState = stateFor(speed, { carrying: heldKind, crouch: q.crouch, interacting: q.working, airborne: !q.eva && (q.y || 0) > .03 });
+    if (seated) animState = "seated";
+    if (a.lastHeld !== heldKind && heldKind !== "none" && a.skin) a.skin.playOnce("pickup", 0.55);
+    a.lastHeld = heldKind;
+    a.skin?.setState(animState, speed);
+    // Head follows the direction of travel (or the aim pitch when standing still).
+    if (a.skin?.setLook) {
+      let headYaw = 0;
+      if (speed > 0.6) {
+        const travel = Math.atan2(mvx, mvz), diff = Math.atan2(Math.sin(travel - a.g.rotation.y), Math.cos(travel - a.g.rotation.y));
+        headYaw = Math.abs(diff) < 1.9 ? diff * 0.8 : 0;
+      }
+      a.skin.setLook(headYaw, seated ? 0 : (q.aimPitch || 0) * 0.6);
+    }
     a.skin?.mixer.update(dt);a.skin?.ground?.(dt,{grounded:!q.eva&&(q.y||0)<.03,speed,floorAt:()=>0});
+    a.heldKind = heldKind;
+    // Surface crews carry their blaster in the right hand in third person (first person uses the view model).
+    if (a.weapon) {
+      if (a.skin?.socket && a.weapon.group.parent !== a.skin.socket) a.skin.socket.add(a.weapon.group);
+      const armed = s.missions[q.team].phase === "surface" && heldKind === "none" && !!a.skin?.socket;
+      a.weapon.group.visible = armed;
+      if (armed) a.weapon.setSlot(q.loadout?.current || 0);
+    }
     a.last.x = a.g.position.x;
     a.last.z = a.g.position.z;
     if (
@@ -1308,7 +1597,7 @@ function updateWorld(s, dt, now) {
       a.g.visible = false;
     a.patch.visible = q.cosmetic !== "Cadet";
     a.patch.material = mat(q.cosmetic === "Vanguard" ? "#e8be73" : "#a5ddbe");
-    a.label.visible = q.id !== id;
+    a.label.visible = q.id !== id && a.g.visible && camera.position.distanceTo(a.g.position) < 45;
     a.selection.visible = q.id === id && view === "third";
   }
   for (const [pid, a] of avatars)
@@ -1316,33 +1605,59 @@ function updateWorld(s, dt, now) {
       removeAvatar(a);
       avatars.delete(pid);
     }
-  const activeHazards = planet === "space" ? own.hazards : [],
+  // Carried things sit in the carrier's hands: crates between both palms, flags upright in the right palm.
+  for (const h of heldQueue) {
+    const a = avatars.get(h.playerId);
+    if (!a || !a.g.visible) continue;
+    a.g.updateMatrixWorld(true);
+    holdPoint(a, h.kind === "flag" ? "one" : "two", tmpHold);
+    if (h.kind === "flag") tmpHold.y -= 0.85 * h.object.scale.y;   // grip the pole a third of the way up
+    placeAtWorld(h.object, tmpHold, a.g.rotation.y);
+  }
+  const cabinView = planet === "space" && [1, 3].includes(p.role) && !p.eva;
+  const activeHazards = planet === "space" && !cabinView ? own.hazards : [],
     ids = new Set(activeHazards.map((h) => h.id));
   for (const h of activeHazards) {
     let m = hazardViews.get(h.id);
     if (!m) {
-      m = ball(scene, 0, 3, 0, 2.2, "#b09d87");
+      m = makeAsteroid(h.id);
+      scene.add(m);
       hazardViews.set(h.id, m);
     }
     m.position.set(base.x + h.x, 3, base.z + h.z);
     m.rotation.y += dt * 0.6;
+    m.rotation.x += dt * 0.35;
   }
   for (const [hid, m] of hazardViews)
     if (!ids.has(hid)) {
+      if (planet === "space") burst(m.position.clone(), "#c9b49a", 12, 0.3, 7);
       disposeDetachedTree([m]);
       m.removeFromParent();
       hazardViews.delete(hid);
     }
+  if (cine) {
+    // Orbiting chase camera around the pad while the ship rises or sets down.
+    const k = Math.min(1, cine.t / cine.dur), alt = cineAltitude();
+    const ang = -0.6 + k * 1.1, dist = 34 + k * 10;
+    const target = new THREE.Vector3(base.x, 1.476 + alt * 0.85 + 4, base.z);
+    camera.position.set(base.x + Math.sin(ang) * dist, 6 + alt * 0.55, base.z + Math.cos(ang) * dist);
+    camera.lookAt(target);
+    if (Math.random() < dt * 22 && alt < 18) burst(new THREE.Vector3(base.x + (Math.random() - 0.5) * 8, 0.4, base.z + (Math.random() - 0.5) * 8), planet === "B" ? "#c8946c" : "#a9a69a", 3, 0.35, 5);
+    marker.visible = false;
+    combatView?.update(s, p, { dt, yaw, pitch, viewMode: "third", ads: false, crouch: false, base, ship: { ...own.shipMotion, y: 1.476 }, objective: null });
+    return;
+  }
   const a = avatars.get(id);
   if (!a) return;
   const spacePilot = planet === "space" && [0, 2].includes(p.role),
     head = new THREE.Vector3(
       spacePilot ? base.x + own.shipMotion.x : a.g.position.x,
-      spacePilot ? 7 : a.g.position.y+(crouch?1.2:2.05),
+      spacePilot ? 9.5 : a.g.position.y+(crouch?1.2:2.05),
       spacePilot ? base.z + own.shipMotion.z : a.g.position.z,
     );
-  const distance = view === "first" ? 0 : spacePilot ? 17 : 8,
-    vertical = Math.sin(pitch) * distance + 1.0;
+  const inCabin = planet === "space" && !spacePilot && !p.eva;
+  const distance = view === "first" ? 0 : spacePilot ? 27 : inCabin ? 4.8 : 8,
+    vertical = Math.sin(pitch) * distance + (inCabin ? 0.4 : 1.0);
   const desired = new THREE.Vector3(
     head.x - Math.sin(yaw) * distance,
     head.y + vertical,
@@ -1360,6 +1675,12 @@ function updateWorld(s, dt, now) {
         colliders.circles,
       );
   desired.lerp(head, 1 - fraction);
+  if (inCabin) {
+    // Keep the chase camera under the ceiling and inside the bulkheads so the cabin reads as a room.
+    desired.y = Math.min(desired.y, 2.95);
+    desired.x = Math.max(base.x - 5.6, Math.min(base.x + 5.6, desired.x));
+    desired.z = Math.max(base.z - 8.3, Math.min(base.z + 8.3, desired.z));
+  }
   camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
   if (view === "first")
     camera.lookAt(
@@ -1368,6 +1689,11 @@ function updateWorld(s, dt, now) {
       head.z - Math.cos(yaw) * 20,
     );
   else camera.lookAt(head);
+  if (crashShake > 0) {
+    crashShake = Math.max(0, crashShake - dt * 1.8);
+    camera.position.x += (Math.random() - 0.5) * crashShake * 0.9;
+    camera.position.y += (Math.random() - 0.5) * crashShake * 0.6;
+  }
   const obj = objective();combatView?.update(s,p,{dt,yaw,pitch,viewMode:view,ads,crouch,base,ship:{...own.shipMotion,y:1.476},objective:obj});document.querySelector('.crosshair').hidden=own.phase==='surface';
   marker.visible = Number.isFinite(obj?.x) && (planet !== "space"||p.eva);
   if (marker.visible) marker.position.set(base.x + obj.x, obj.y||0, base.z + obj.z);
@@ -1651,6 +1977,7 @@ function initInputs() {
 try {
   initWorld();
   initInputs();
+  if(new URLSearchParams(location.search).has('dev'))window.__expeditionDebug={avatars,samples,ships,get latest(){return latest;},get view(){return view;},camera};
   if(new URLSearchParams(location.search).has('dev'))window.__expeditionDiagnostics=()=>({render:{...renderer.info.render},memory:{...renderer.info.memory},...estimateSceneMemory(scene),avatars:[...avatars.values()].map(a=>({species:a.skin?.species,legs:a.skin?.grounding.legs.length})),phase:mission()?.phase});
   loop();
 } catch (e) {

@@ -65,8 +65,9 @@ export function createFpsView({camera, scene, sfx}) {
         m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
         const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
         m.position.sub(centre);                      // centre the model on its own origin
-        // Kenney blasters are modelled with the muzzle toward +Z; the camera looks down -Z, so turn it round.
-        m.rotation.y = Math.PI;
+        // Kenney blasters are modelled with the muzzle toward -Z (the grip sits toward +Z), which already matches
+        // the camera's forward axis. Turning them round put the barrel toward the player.
+        m.rotation.y = 0;
         const holder = new THREE.Group(); holder.add(m); holder.scale.setScalar(w.view.scale); group.add(holder);
         muzzle = new THREE.Vector3(0, size.y * 0.15 * w.view.scale, -size.z * 0.5 * w.view.scale);
       } catch {
