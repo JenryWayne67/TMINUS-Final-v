@@ -1,6 +1,7 @@
 import {estimateSceneMemory} from './performance-core.js';
 import {mountAccountUI} from './account-ui.js';
 import {groundObject} from './model-grounding.js';
+import {loadGLB} from './asset-loader.js';
 import {createOnlineCombatView} from './online-combat-view.js';
 import {getPreferences,observePreferences,mountPreferences} from './preferences.js';
 import {EVA} from './spacewalk-core.js';
@@ -907,6 +908,19 @@ function initWorld() {
     decor.push(rock);
   }
   // Planet B science flags: planted on a cairn, claimed with a 5 s hold, carried upright in one hand.
+  // One surface boulder uses NASA's 1999 RQ36 shape as a visual reference.
+  // Planet B and its geology remain fictional; collision geometry is unchanged.
+  const referenceRock=SURFACE_ROCKS[0],rockFallback=decor[0];
+  loadGLB('./assets/nasa/1999-rq36-asteroid.glb').then(g=>{
+    if(!root.parent)return;
+    const model=g.scene.clone(true),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
+    if(!Number.isFinite(size.length())||size.length()===0)return;
+    model.scale.setScalar(referenceRock.r*2/Math.max(size.x,size.y,size.z));
+    bounds.setFromObject(model);
+    model.position.copy(bounds.getCenter(new THREE.Vector3()).multiplyScalar(-1));
+    model.position.add(new THREE.Vector3(referenceRock.x,referenceRock.r*.7,referenceRock.z));
+    root.add(model);decor.push(model);rockFallback.userData.nasaReplacement=true;rockFallback.visible=false;
+  }).catch(()=>{});
   for (const [x, z] of FLAG_SITES) {
     const flag = createFlagModel();
     flag.group.position.set(x, 0, z);
@@ -1354,7 +1368,7 @@ function updateWorld(s, dt, now) {
   }
   ground.visible = planet !== "space";
   ground.material.color.set(planet === "B" ? "#aa775b" : "#77766c");
-  decor.forEach((o) => (o.visible = planet === "B"));
+  decor.forEach((o) => (o.visible = planet === "B" && !o.userData.nasaReplacement));
   scene.background.set(planet === "space" ? "#111529" : "#30273e");
   for (const ship of ships) {
     const data = s.missions[ship.team],

@@ -48,19 +48,31 @@ export async function createCampaignWorld(canvas, callbacks={}) {
  for(const room of layout.modules){const node=new THREE.Group();node.position.set(room.center[0]+.9,0,room.zmin+1.1);interior.add(node);box(node,[.45,.8,.4],[0,.4,0],'#263a48');const screen=box(node,[.39,.23,.04],[0,.82,-.2],'#4ee5c1');screen.material.emissive.set('#4ee5c1');screen.material.emissiveIntensity=.5;stations[room.name]=node;}
  // Role bots share the cabin: they walk between their room consoles and pick up faults and preparation work.
  const crew=createCampaignCrew(interior,layout,{getState:()=>callbacks.getState?.(),crewAct:(id,who)=>callbacks.crewAct?.(id,who),playerPosition:()=>({x:walker.x,z:walker.z})});
- // Starfield, Earth, ship airlock and a serviceable generic telescope for the EVA mission.
+ // Starfield, Earth, ship airlock and a serviceable telescope for the EVA mission.
  const exterior=new THREE.Group();scene.add(exterior);exterior.visible=false;
  const earthGeo=new THREE.IcosahedronGeometry(130,3),earthMat=new THREE.MeshStandardMaterial({color:'#286baf',roughness:1,flatShading:true});ownedGeometries.push(earthGeo);ownedMaterials.push(earthMat);const earth=new THREE.Mesh(earthGeo,earthMat);earth.position.set(0,-190,-110);scene.add(earth);
  for(let i=0;i<65;i++){const a=i*2.39996,r=Math.sqrt(i/65)*110;box(earth,[14+(i%5)*3,2,7], [Math.cos(a)*r,Math.sqrt(Math.max(0,130*130-r*r)),Math.sin(a)*r],i%3?'#4eaa9a':'#d6ecdf');}
  const stars=new THREE.BufferGeometry(),vertices=[];for(let i=0;i<550;i++){const a=i*2.39996,z=1-2*(i+.5)/550,r=Math.sqrt(1-z*z);vertices.push(Math.cos(a)*r*650,z*650,Math.sin(a)*r*650);}stars.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));const starMat=new THREE.PointsMaterial({color:'#d9e5f4',size:1.3,sizeAttenuation:false});scene.add(new THREE.Points(stars,starMat));ownedGeometries.push(stars);ownedMaterials.push(starMat);
  if(callbacks.ship){const ship=callbacks.ship.clone(true);ship.position.set(0,0,1);ship.rotation.set(0,0,0);ship.scale.setScalar(.25);ship.visible=true;ship.traverse(o=>{if(o.isMesh){const materials=(Array.isArray(o.material)?o.material:[o.material]).map(m=>{const n=m.clone();n.transparent=false;n.opacity=1;ownedMaterials.push(n);return n;});o.material=Array.isArray(o.material)?materials:materials[0];}});exterior.add(ship);}else box(exterior,[6,4,9],[0,0,1],'#e2e8e3');
  box(exterior,[2,2,.18],[0,0,-3.6],'#365463');
- const telescope=new THREE.Group();telescope.position.set(0,0,-17);exterior.add(telescope);box(telescope,[3,3,6],[0,0,0],'#c7ced1');box(telescope,[2.8,2.8,.12],[0,0,-3.1],'#172736');box(telescope,[1.1,.8,.2],[0,0,3.12],'#f1bc69');
- for(const sign of [-1,1]){box(telescope,[7,.1,3],[sign*5,0,0],'#2c5581');for(let j=0;j<6;j++)box(telescope,[.03,.13,3],[sign*5-3+j,0,0],'#7eacc3');}
+ const telescope=new THREE.Group();telescope.position.set(0,0,-17);exterior.add(telescope);
+ const telescopeFallback=new THREE.Group();telescope.add(telescopeFallback);
+ box(telescopeFallback,[3,3,6],[0,0,0],'#c7ced1');box(telescopeFallback,[2.8,2.8,.12],[0,0,-3.1],'#172736');box(telescopeFallback,[1.1,.8,.2],[0,0,3.12],'#f1bc69');
+ for(const sign of [-1,1]){box(telescopeFallback,[7,.1,3],[sign*5,0,0],'#2c5581');for(let j=0;j<6;j++)box(telescopeFallback,[.03,.13,3],[sign*5-3+j,0,0],'#7eacc3');}
  const tetherPositions=new Float32Array(6),tetherGeo=new THREE.BufferGeometry();tetherGeo.setAttribute('position',new THREE.BufferAttribute(tetherPositions,3));const tetherMat=new THREE.LineBasicMaterial({color:'#ffb458'});const tether=new THREE.Line(tetherGeo,tetherMat);tether.frustumCulled=false;exterior.add(tether);ownedGeometries.push(tetherGeo);ownedMaterials.push(tetherMat);
  const beacon=box(exterior,[.4,.4,.4],[0,0,-13.5],'#5ce8c5');beacon.material.emissive.set('#5ce8c5');beacon.material.emissiveIntensity=1;
  // Prop loads do not block entry; the primary ship and navigation data are required.
  let disposed=false;
+ // Keep the gameplay beacon and interaction distance fixed; only the visual is replaced.
+ loadGLB('./assets/nasa/hubble-space-telescope-a.glb').then(g=>{
+  if(disposed)return;
+  const model=g.scene.clone(true),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
+  if(!Number.isFinite(size.length())||size.length()===0)return;
+  model.scale.setScalar(6/Math.max(size.x,size.y,size.z));
+  bounds.setFromObject(model);model.position.sub(bounds.getCenter(new THREE.Vector3()));
+  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+  telescope.add(model);telescopeFallback.visible=false;
+ }).catch(()=>{});
  Promise.all(layout.props.map(async p=>{try{const g=await loadGLB('./assets/props/'+p.asset.split('/').pop());if(disposed)return;const m=g.scene.clone(true);m.position.set(...p.position);m.rotation.y=THREE.MathUtils.degToRad(p.rotation_y_deg||0);interior.add(m);}catch{}}));
  let walker=createWalker(nav,layout,'cockpit'),eva=false,first=false,paused=false,lastRoom='',dragging=false,near=false,walkPhase=0,walkDistance=0,prevWalk={x:walker.x,z:walker.z},walkSpeed=0;
  const float={x:0,y:0,z:-5};const keys=new Set();
