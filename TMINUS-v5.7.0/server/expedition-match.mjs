@@ -417,7 +417,7 @@ export class ExpeditionMatch extends Match {
     } else if (task.type === "system") {
       const c = SYSTEM_STATIONS.find((c) => c.id === task.id);
       if (c && dist(point, c) <= 3)
-        changed = maintainSystem(s, p.role, dt, c.id);
+        changed = maintainSystem(s, p.role === 3 ? 1 : p.role, dt, c.id);   // Raider assists inside the cabin
     } else if (task.type === "scan" && s.phase === "surface") {
       const f = this.science.flags.find((f) => String(f.id) === task.id),
         w = this.world(p);
@@ -431,7 +431,7 @@ export class ExpeditionMatch extends Match {
         const aligned =
           Math.abs(
             Math.atan2(Math.sin(desired - p.aim), Math.cos(desired - p.aim)),
-          ) < 0.45;
+          ) < 0.9;
         changed = scanFlag(
           this.science,
           f.id,
@@ -441,12 +441,30 @@ export class ExpeditionMatch extends Match {
           distance,
           aligned,
           support||s.scanBoost>0,
+          { anyRole: true },
         );
         if (f.state === "carried" && f.owner === p.team && f.carrier === p.role)
           p.carry = f.id;
       }
     }
     if (changed) p.contribution += dt;
+  }
+  // Walking back into the ship area with a flag stows it automatically (no extra key press).
+  autoStowFlags() {
+    for (const p of this.players.values()) {
+      const s = this.missions[p.team];
+      if (!p.connected || s.phase !== "surface" || p.hp <= 0 || p.eva) continue;
+      const held = this.science.flags.find((f) => f.state === "carried" && f.owner === p.team && f.carrier === p.role);
+      if (!held) continue;
+      const local = this.local(p);
+      const nearShip = Math.hypot(local.x, local.z) < 10 || Math.hypot(local.x, local.z + 17) < 4;
+      if (!nearShip) continue;
+      if (loadFlag(this.science, p.team, p.role, 0)) {
+        p.carry = null;
+        p.contribution += 25;
+        this.sendEvent(`${this.science.teams[p.team].name} stowed Science Flag ${held.id + 1} · ${flagCounts(this.science, p.team).onboard} onboard`, p.team);
+      }
+    }
   }
   fire(p) {
     const s = this.missions[p.team];
@@ -495,6 +513,7 @@ export class ExpeditionMatch extends Match {
       if ((buttons & 1)||p.firePressed) this.fire(p);p.firePressed=false;p.jumpPressed=false;
     }
     tickOrdnance(this,dt);
+    this.autoStowFlags();
     for (const team of this.activeTeams) {
       const s = this.missions[team],
         t = this.science.teams[team];
@@ -520,6 +539,12 @@ export class ExpeditionMatch extends Match {
           ) {
             s.hull = Math.max(0, s.hull - (s.shield>0?0:s.decoy>0?3:12));
             h.hp = 0;
+            // The ship is struck, not phased through: shove it away from the impact.
+            const away = Math.sign(s.shipMotion.x - h.x) || 1;
+            s.shipMotion.x = clamp(s.shipMotion.x + away * 3, -17, 17);
+            s.shipMotion.z = clamp(s.shipMotion.z + 4, -7, 14);
+            s.impacts = (s.impacts || 0) + 1;
+            this.sendEvent(`${this.science.teams[team].name} hull struck by debris · ${Math.round(s.hull)}%`, team);
           }
         }
         s.hazards = s.hazards.filter((h) => h.hp > 0 && h.z < 25);
@@ -609,7 +634,7 @@ export class ExpeditionMatch extends Match {
               f.owner === p.team &&
               f.carrier === p.role,
           )?.id ?? null,
-        commandSeq: this.players.get(p.id).commandSeq,working:!!(this.players.get(p.id).task&&(this.players.get(p.id).input.buttons&4)),crouch:!!this.players.get(p.id).input.crouch,
+        commandSeq: this.players.get(p.id).commandSeq,working:!!(this.players.get(p.id).task&&(this.players.get(p.id).input.buttons&4)),crouch:!!this.players.get(p.id).input.crouch,aimPitch:Number(this.players.get(p.id).aimPitch)||0,
         cosmetic: this.players.get(p.id).cosmetic || "Cadet",
         contribution: Math.floor(this.players.get(p.id).contribution),
       })),

@@ -12,6 +12,12 @@ const FILES = {frog: './assets/characters/frog.glb', bee: './assets/characters/b
   robot: './assets/characters/Robot.fbx'};
 export const TARGET_HEIGHT = 2.5;                                     // metres, same as the procedural crew
 const FADE = 0.18;
+const ONE_SHOT = new Set(['pickup', 'celebrate']);
+// FBX clips arrive as "Armature|Clip"; GLB clips are bare. Match either form.
+function findClip(list, name) {
+  if (!name) return null;
+  return list.find(c => c.name === name) || list.find(c => c.name.endsWith('|' + name)) || null;
+}
 const cache = new Map();
 
 function loadTemplate(species) {
@@ -65,9 +71,10 @@ export async function attachSkin(avatar, role, {height = TARGET_HEIGHT} = {}) {
   const action = state => {
     const name = clipFor(species, state);
     if (!actions.has(name)) {
-      const clip = THREE.AnimationClip.findByName(tpl.animations, name) || tpl.animations[0];
+      const clip = findClip(tpl.animations, name) || findClip(tpl.animations, clipFor(species, 'idle')) || tpl.animations[0];
       const a = mixer.clipAction(clip);
-      a.setLoop(THREE.LoopRepeat, Infinity);
+      if (ONE_SHOT.has(state)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+      else a.setLoop(THREE.LoopRepeat, Infinity);
       actions.set(name, a);
     }
     return actions.get(name);
@@ -75,7 +82,12 @@ export async function attachSkin(avatar, role, {height = TARGET_HEIGHT} = {}) {
   let disposed=false;
   const skin = {species, mixer, holder, state: null, name: null,
     dispose(){if(disposed)return;disposed=true;mixer.stopAllAction();mixer.uncacheRoot(holder);const skeletons=new Set();holder.traverse(o=>{if(o.isSkinnedMesh&&o.skeleton)skeletons.add(o.skeleton);});for(const skeleton of skeletons)skeleton.dispose();holder.removeFromParent();},
+    lock: 0,
+    // Play a one-shot clip (pick-up, celebrate) and hold it before locomotion resumes.
+    playOnce(state, seconds = 0.9) { this.lock = 0; this.setState(state, 0); this.lock = performance.now() + seconds * 1000; },
     setState(state, speed = 0) {
+      if (this.lock && performance.now() < this.lock) return;
+      this.lock = 0;
       const next = action(state), rate = timeScaleFor(species, state, speed);
       if (this.state !== state) {
         const prev = this.name && actions.get(this.name);
@@ -86,7 +98,56 @@ export async function attachSkin(avatar, role, {height = TARGET_HEIGHT} = {}) {
     }};
   skin.setState('idle', 0);
   mixer.update(0.001);
-  skin.grounding=createFootGrounding(obj);skin.ground=(dt,options)=>skin.grounding.apply(dt,options);avatar.skin = skin;
+  // Bones used for the head turn and the hand socket. Animals have no hand bone: the middle-finger root is the palm.
+  // Loaders sanitise bone names ("Middle1.R" becomes "Middle1R"), so compare without punctuation.
+  const plain = n => String(n).replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const bone = (...names) => { for (const n of names) { let found = null; const want = plain(n); obj.traverse(o => { if (!found && o.isBone && (plain(o.name) === want || plain(o.name).endsWith(want))) found = o; }); if (found) return found; } return null; };
+  const head = bone('Head'), neck = bone('Neck');
+  let palm = bone('Hand.R', 'Middle1.R', 'LowerArm.R'), palmL = bone('Hand.L', 'Middle1.L', 'LowerArm.L');
+  // Rigs disagree on which side ".R" is. The model faces +Z, so its right hand is the palm at -X.
+  if (palm && palmL) {
+    holder.updateMatrixWorld(true);
+    const a = holder.worldToLocal(palm.getWorldPosition(new THREE.Vector3())), b = holder.worldToLocal(palmL.getWorldPosition(new THREE.Vector3()));
+    if (a.x > b.x) [palm, palmL] = [palmL, palm];
+  }
+  // Hand sockets live on the avatar (not on the bone) so a held item never inherits the rig's import scale.
+  const socket = new THREE.Group(); socket.name = 'hand-socket'; avatar.group.add(socket);
+  const look = {yaw: 0, pitch: 0, tYaw: 0, tPitch: 0};
+  const crouchDip = {v: 0};
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qp = new THREE.Quaternion(), vtmp = new THREE.Vector3(), vtmp2 = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0), SIDE = new THREE.Vector3(1, 0, 0);
+  function turnBone(b, yaw, pitch) {
+    if (!b?.parent) return;
+    b.parent.getWorldQuaternion(qp);
+    avatar.group.getWorldQuaternion(qb);
+    // Rotate about the avatar's up axis, then about its side axis, expressed in the bone's parent space.
+    qa.setFromAxisAngle(vtmp.copy(UP).applyQuaternion(qb), yaw).multiply(qb.clone().multiply(new THREE.Quaternion().setFromAxisAngle(SIDE, pitch)).multiply(qb.clone().invert()));
+    b.quaternion.premultiply(qp.clone().invert().multiply(qa).multiply(qp));
+  }
+  skin.setLook = (yaw = 0, pitch = 0) => { look.tYaw = Math.max(-1.05, Math.min(1.05, yaw)); look.tPitch = Math.max(-0.5, Math.min(0.5, pitch)); };
+  skin.socket = socket;
+  skin.handWorld = (target = new THREE.Vector3()) => (palm ? palm.getWorldPosition(target) : avatar.group.localToWorld(target.set(-0.35, 1.2, 0.35)));
+  skin.handWorldL = (target = new THREE.Vector3()) => (palmL ? palmL.getWorldPosition(target) : avatar.group.localToWorld(target.set(0.35, 1.2, 0.35)));
+  skin.grounding=createFootGrounding(obj);
+  skin.ground=(dt,options={})=>{
+    skin.grounding.apply(dt,options);
+    // Chip has no crouch clip: lower and compress the rig so crouching still reads clearly.
+    const wantDip = species === 'robot' && /^crouch/.test(skin.state || '') ? 1 : 0;
+    crouchDip.v += (wantDip - crouchDip.v) * (1 - Math.exp(-10 * Math.max(0, dt || 0)));
+    holder.scale.y = 1 - crouchDip.v * 0.24; holder.position.y = -crouchDip.v * 0.05;
+    // Head turns toward where the crew member is moving or looking, split between neck and head.
+    const k = 1 - Math.exp(-9 * Math.max(0, dt || 0));
+    look.yaw += (look.tYaw - look.yaw) * k; look.pitch += (look.tPitch - look.pitch) * k;
+    if (Math.abs(look.yaw) > 1e-3 || Math.abs(look.pitch) > 1e-3) {
+      holder.updateMatrixWorld(true);
+      turnBone(neck, look.yaw * 0.4, look.pitch * 0.35);
+      if (neck) neck.updateMatrixWorld(true);
+      turnBone(head, look.yaw * 0.6, look.pitch * 0.65);
+    }
+    // Socket follows the right palm in avatar space every frame.
+    if (palm) { holder.updateMatrixWorld(true); palm.getWorldPosition(vtmp2); avatar.group.worldToLocal(vtmp2); socket.position.copy(vtmp2); }
+  };
+  avatar.skin = skin;
   return skin;
 }
 

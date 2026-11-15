@@ -4,6 +4,7 @@ import * as FPS from './fps-core.js';
 import {createFpsView,createSfx} from './fps-view.js';
 import {getPreferences} from './preferences.js';
 import {disposeDetachedTree} from './resource-lifecycle.js';
+import {scanFraction} from './science-match.js';
 export function createOnlineCombatView(camera,scene){
  const sfx=createSfx(()=>!getPreferences().audioEnabled),view=createFpsView({camera,scene,sfx}),seen=new Set(),grenades=new Map(),tether=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#c7d8ee'}));scene.add(tether);tether.visible=false;
  view.loadModels();let soundLoaded=false,priorHealth=160;
@@ -13,7 +14,7 @@ export function createOnlineCombatView(camera,scene){
   view.setVisible(surface);view.root.visible=surface&&(viewMode==='first'||ads);
   if(surface){const fov=view.update({loadout:l,dt,ads,sprinting:false,crouch,moving,speed,look:{yaw,pitch},carrying:player.carry!==null});if(fov){camera.fov=fov.fov;camera.updateProjectionMatrix();}}
   else view.update({loadout:l,dt,ads:false,sprinting:false,crouch:false,moving:false,speed:0,look:{yaw,pitch},carrying:false});
-  view.updateHud({visible:surface,loadout:l,vitals:v,spread:FPS.spreadAngle(l,{ads,moving,crouch}),ads,crouch,sprinting:false,cursor:document.pointerLockElement===null,capture:objective?.target?.type==='scan'?{frac:(snapshot.flags[Number(objective.target.id)]?.progress||0),label:objective.title}:null,carrying:player.carry!==null});
+  view.updateHud({visible:surface,loadout:l,vitals:v,spread:FPS.spreadAngle(l,{ads,moving,crouch}),ads,crouch,sprinting:false,cursor:document.pointerLockElement===null,capture:objective?.target?.type==='scan'?{frac:scanFraction(snapshot.flags[Number(objective.target.id)]),label:'HOLD E · '+Math.round(scanFraction(snapshot.flags[Number(objective.target.id)])*100)+'%'}:null,carrying:player.carry!==null});
   const health=v.health+v.shield;if(surface&&health<priorHealth)sfx.play('shield_hit',{volume:.4});priorHealth=health;
   for(const event of snapshot.combatEvents||[]){if(seen.has(event.id))continue;seen.add(event.id);if(snapshot.time-event.time>1.5)continue;
    if(event.type==='shot'&&surface){const from=new THREE.Vector3(...event.origin),to=from.clone().addScaledVector(new THREE.Vector3(...event.direction),FPS.WEAPONS[event.weapon].range);if(event.attacker===player.id)view.onFire(event.weapon,FPS.WEAPONS[event.weapon].recoil.pitch);view.tracer(from,to);}
