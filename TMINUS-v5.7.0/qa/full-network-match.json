@@ -1,0 +1,17 @@
+{
+  "method": "16 independent compressed WebSocket clients, authoritative snapshots and ordinary input/actions only; no state fixtures or timer acceleration",
+  "players": 16,
+  "latencyMs": 80,
+  "elapsedSeconds": 360.9,
+  "delivered": [
+    3,
+    3,
+    3,
+    3
+  ],
+  "events": [
+    "turret-shot"
+  ],
+  "uncompressedReceivedBytes": 2006426326,
+  "actualSocketBytes": 274684524
+}

@@ -1,0 +1,16 @@
+// Persistent, validated player preferences shared by all game modes.
+const KEY='tminus-preferences-v1';
+const defaults={audioEnabled:false,masterVolume:.7,effectsVolume:.8,voiceVolume:.85,textScale:1,highContrast:false,reducedMotion:false,colorSafe:false,subtitles:true,sensitivity:1,invertY:false,holdToggle:false,cameraShake:.4};
+const listeners=new Set();
+const number=(x,min,max,fallback)=>Number.isFinite(Number(x))?Math.max(min,Math.min(max,Number(x))):fallback;
+export function normalizePreferences(raw={}){if(!raw||typeof raw!=='object')raw={};const p={...defaults};for(const key of Object.keys(defaults)){if(typeof defaults[key]==='boolean'){if(typeof raw[key]==='boolean')p[key]=raw[key];}else p[key]=number(raw[key],key==='textScale'?.85:key==='sensitivity'?.3:0,key==='textScale'?1.5:key==='sensitivity'?3:1,defaults[key]);}return p;}
+let prefs=normalizePreferences();try{prefs=normalizePreferences(JSON.parse(localStorage.getItem(KEY)||'{}'));}catch{}
+export const getPreferences=()=>({...prefs});
+export function updatePreferences(next){prefs=normalizePreferences({...prefs,...next});try{localStorage.setItem(KEY,JSON.stringify(prefs));}catch{}applyPreferences();for(const fn of listeners)fn({...prefs});return getPreferences();}
+export function observePreferences(fn){listeners.add(fn);fn(getPreferences());return()=>listeners.delete(fn);}
+export function applyPreferences(){if(typeof document==='undefined')return;const root=document.documentElement;root.style.setProperty('--game-text-scale',prefs.textScale);for(const [key,cls]of[['highContrast','high-contrast'],['reducedMotion','reduce-motion'],['colorSafe','color-safe']])root.classList.toggle(cls,prefs[key]);}
+export function mountPreferences(container){if(!container||container.querySelector('[data-game-preferences]'))return;const group=document.createElement('details');group.dataset.gamePreferences='';group.className='game-preferences';group.innerHTML='<summary>Audio & accessibility</summary>'+
+ [['audioEnabled','Enable sound'],['highContrast','High contrast'],['reducedMotion','Reduce motion'],['colorSafe','Extra team symbols'],['invertY','Invert vertical look'],['holdToggle','Toggle work instead of holding E']].map(([key,label])=>`<label><input type="checkbox" data-pref="${key}"> ${label}</label>`).join('')+
+ [['masterVolume','Master volume',0,1,.05],['effectsVolume','Effects volume',0,1,.05],['textScale','Text size',.85,1.5,.05],['sensitivity','Look sensitivity',.3,3,.1],['cameraShake','Camera motion',0,1,.1]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-pref="${key}" min="${min}" max="${max}" step="${step}"><output data-value="${key}"></output></label>`).join('');
+ const fill=()=>{const p=getPreferences();group.querySelectorAll('[data-pref]').forEach(input=>{if(input.type==='checkbox')input.checked=p[input.dataset.pref];else{input.value=p[input.dataset.pref];group.querySelector(`[data-value="${input.dataset.pref}"]`).textContent=input.value;}});};fill();group.addEventListener('input',e=>{const key=e.target.dataset.pref;if(key){updatePreferences({[key]:e.target.type==='checkbox'?e.target.checked:Number(e.target.value)});fill();}});container.appendChild(group);applyPreferences();}
+applyPreferences();

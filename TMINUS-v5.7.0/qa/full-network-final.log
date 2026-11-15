@@ -1,0 +1,211 @@
+MATCH 10 [
+  { team: 0, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 0, cargo: 0, score: 0 }
+]
+MATCH 20 [
+  { team: 0, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 0, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 0, cargo: 0, score: 0 }
+]
+MATCH 30 [
+  { team: 0, phase: 'assembly', parts: 4, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 4, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 4, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 4, cargo: 0, score: 0 }
+]
+MATCH 40 [
+  { team: 0, phase: 'assembly', parts: 5, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 5, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 5, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 4, cargo: 0, score: 0 }
+]
+MATCH 50 [
+  { team: 0, phase: 'assembly', parts: 8, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 8, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 8, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 8, cargo: 0, score: 0 }
+]
+MATCH 60 [
+  { team: 0, phase: 'assembly', parts: 10, cargo: 0, score: 0 },
+  { team: 1, phase: 'assembly', parts: 9, cargo: 0, score: 0 },
+  { team: 2, phase: 'assembly', parts: 9, cargo: 0, score: 0 },
+  { team: 3, phase: 'assembly', parts: 9, cargo: 0, score: 0 }
+]
+MATCH 70 [
+  { team: 0, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'outfit', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 80 [
+  { team: 0, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'outfit', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 90 [
+  { team: 0, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'outfit', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 100 [
+  { team: 0, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'outfit', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'outfit', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 110 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 120 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 130 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 140 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 151 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 161 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 171 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 181 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 191 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 201 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 211 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 221 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 0, score: 0 }
+]
+MATCH 231 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 0, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 1, score: 0 }
+]
+MATCH 241 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 1, score: 0 }
+]
+MATCH 251 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 1, score: 0 }
+]
+MATCH 261 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 1, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 2, score: 0 }
+]
+MATCH 271 [
+  { team: 0, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 2, score: 0 }
+]
+MATCH 281 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 2, score: 0 }
+]
+MATCH 291 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 3, phase: 'surface', parts: 12, cargo: 2, score: 0 }
+]
+MATCH 301 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 2, phase: 'surface', parts: 12, cargo: 2, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 3, score: 0 }
+]
+MATCH 311 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 3, score: 0 }
+]
+MATCH 321 [
+  { team: 0, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 3, score: 0 }
+]
+MATCH 332 [
+  { team: 0, phase: 'delivery', parts: 12, cargo: 3, score: 0 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 3, score: 0 }
+]
+MATCH 342 [
+  { team: 0, phase: 'delivery', parts: 12, cargo: 0, score: 3 },
+  { team: 1, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 3, phase: 'flight', parts: 12, cargo: 3, score: 0 }
+]
+MATCH 352 [
+  { team: 0, phase: 'delivery', parts: 12, cargo: 0, score: 3 },
+  { team: 1, phase: 'delivery', parts: 12, cargo: 0, score: 3 },
+  { team: 2, phase: 'flight', parts: 12, cargo: 3, score: 0 },
+  { team: 3, phase: 'delivery', parts: 12, cargo: 0, score: 3 }
+]
+FULL NETWORK PASS {"method":"16 independent compressed WebSocket clients, authoritative snapshots and ordinary input/actions only; no state fixtures or timer acceleration","players":16,"latencyMs":80,"elapsedSeconds":360.9,"delivered":[3,3,3,3],"events":["turret-shot"],"uncompressedReceivedBytes":2006426326,"actualSocketBytes":274684524}

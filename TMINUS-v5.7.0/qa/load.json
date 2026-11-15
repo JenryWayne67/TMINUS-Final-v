@@ -1,0 +1,23 @@
+{
+  "clients": 64,
+  "rooms": 4,
+  "seconds": 30,
+  "simulatedRoundTripMs": 150,
+  "measuredRoundTripMs": 212.12,
+  "inputHz": 20,
+  "eventLoopP95Ms": 123.8,
+  "eventLoopMaxMs": 308.02,
+  "snapshotBytes": [
+    23953,
+    23984,
+    23971,
+    23984
+  ],
+  "ticks": [
+    935,
+    870,
+    779,
+    688
+  ],
+  "elapsedSeconds": 46.91
+}

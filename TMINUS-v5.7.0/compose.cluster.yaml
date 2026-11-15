@@ -1,0 +1,48 @@
+# Private worker network with a public gateway. Generate CLUSTER_KEY before use.
+services:
+  gateway:
+    build: .
+    command: ["node", "server/cluster-start.mjs"]
+    ports: ["8095:8095"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8095
+      DATA_DIR: /app/data
+      CLUSTER_KEY: ${CLUSTER_KEY:?Set a random shared key of at least 32 characters}
+      CLUSTER_WORKERS: '[{"id":"00","url":"http://worker00:8096"},{"id":"01","url":"http://worker01:8096"}]'
+    volumes: ["profiles:/app/data"]
+    restart: unless-stopped
+  worker00:
+    build: .
+    command: ["node", "server/cluster-worker.mjs"]
+    environment: &worker-environment
+      HOST: 0.0.0.0
+      PORT: 8096
+      DATA_DIR: /app/data
+      WORKER_ID: "00"
+      CLUSTER_KEY: ${CLUSTER_KEY:?Set a random shared key of at least 32 characters}
+      PROFILE_SERVICE_URL: http://gateway:8095
+    volumes: ["rooms00:/app/data"]
+    restart: unless-stopped
+  worker01:
+    build: .
+    command: ["node", "server/cluster-worker.mjs"]
+    environment:
+      <<: *worker-environment
+      WORKER_ID: "01"
+    volumes: ["rooms01:/app/data"]
+    restart: unless-stopped
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["public"]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data", "caddy-config:/config"]
+    restart: unless-stopped
+volumes:
+  profiles:
+  rooms00:
+  rooms01:
+  caddy-data:
+  caddy-config:

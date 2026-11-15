@@ -1,0 +1,476 @@
+WALK CONTEXT { focus: 'CANVAS', paused: false, hidden: false, view: 'play' }
+WALK { x: 0, z: 28.7 } { x: 0, z: 31.29999999999998 }
+TASK CONTEXT check-power {
+  phase: 'checkout',
+  context: {
+    room: 'power_room',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 7.4 },
+  activity: null,
+  done: [],
+  buttons: [ 'check-power' ]
+}
+PASS campaign check-power
+TASK CONTEXT check-cabin {
+  phase: 'checkout',
+  context: {
+    room: 'life_support',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 12.7 },
+  activity: null,
+  done: [ 'check-power' ],
+  buttons: [ 'check-power' ]
+}
+PASS campaign check-cabin
+TASK CONTEXT check-payload {
+  phase: 'checkout',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [ 'check-power', 'check-cabin' ],
+  buttons: []
+}
+PASS campaign check-payload
+TASK CONTEXT launch {
+  phase: 'checkout',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [ 'check-power', 'check-cabin', 'check-payload' ],
+  buttons: []
+}
+PASS campaign launch
+TASK CONTEXT deploy {
+  phase: 'commission',
+  context: {
+    room: 'power_room',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 7.4 },
+  activity: null,
+  done: [ 'check-power', 'check-cabin', 'check-payload', 'launch' ],
+  buttons: [ 'deploy' ]
+}
+PASS campaign deploy
+TASK CONTEXT autopilot {
+  phase: 'commission',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [ 'check-power', 'check-cabin', 'check-payload', 'launch', 'deploy' ],
+  buttons: []
+}
+PASS campaign autopilot
+TASK CONTEXT commission {
+  phase: 'commission',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [
+    'check-power',
+    'check-cabin',
+    'check-payload',
+    'launch',
+    'deploy',
+    'autopilot'
+  ],
+  buttons: [ 'commission' ]
+}
+PASS campaign commission
+TASK CONTEXT rendezvous {
+  phase: 'rendezvous',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [
+    'check-power',
+    'check-cabin',
+    'check-payload',
+    'launch',
+    'deploy',
+    'autopilot',
+    'commission'
+  ],
+  buttons: [ 'rendezvous' ]
+}
+PASS campaign rendezvous
+TASK CONTEXT tool {
+  phase: 'prepare',
+  context: {
+    room: 'workshop',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 18 },
+  activity: null,
+  done: [
+    'check-power',
+    'check-cabin',
+    'check-payload',
+    'launch',
+    'deploy',
+    'autopilot',
+    'commission',
+    'rendezvous'
+  ],
+  buttons: [ 'rendezvous' ]
+}
+PASS campaign tool
+TASK CONTEXT suit {
+  phase: 'prepare',
+  context: { room: 'airlock', near: true, atTelescope: false, atAirlock: false },
+  position: { x: -3.35, z: 19 },
+  activity: null,
+  done: [
+    'check-power',
+    'check-cabin',
+    'check-payload',
+    'launch',
+    'deploy',
+    'autopilot',
+    'commission',
+    'rendezvous',
+    'tool'
+  ],
+  buttons: [ 'suit', 'tether', 'depressurize' ]
+}
+PASS campaign suit
+TASK CONTEXT tether {
+  phase: 'prepare',
+  context: { room: 'airlock', near: true, atTelescope: false, atAirlock: false },
+  position: { x: -3.35, z: 19 },
+  activity: null,
+  done: [
+    'check-power',
+    'check-cabin',
+    'check-payload',
+    'launch',
+    'deploy',
+    'autopilot',
+    'commission',
+    'rendezvous',
+    'tool',
+    'suit'
+  ],
+  buttons: [ 'tether', 'depressurize' ]
+}
+PASS campaign tether
+TASK CONTEXT depressurize {
+  phase: 'prepare',
+  context: { room: 'airlock', near: true, atTelescope: false, atAirlock: false },
+  position: { x: -3.35, z: 19 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether'
+  ],
+  buttons: [ 'depressurize' ]
+}
+PASS campaign depressurize
+TASK CONTEXT install {
+  phase: 'eva',
+  context: { room: 'exterior', near: true, atTelescope: true, atAirlock: false },
+  position: { x: 0, y: 0, z: -13.5 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize'
+  ],
+  buttons: [ 'install' ]
+}
+PASS campaign install
+TASK CONTEXT ingress {
+  phase: 'eva',
+  context: { room: 'airlock', near: true, atTelescope: false, atAirlock: true },
+  position: { x: 0, y: 0, z: -5 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install'
+  ],
+  buttons: [ 'ingress' ]
+}
+PASS campaign ingress
+TASK CONTEXT calibrate {
+  phase: 'science',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress'
+  ],
+  buttons: [ 'calibrate', 'advance' ]
+}
+PASS campaign calibrate
+TASK CONTEXT observe {
+  phase: 'science',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate'
+  ],
+  buttons: [ 'calibrate', 'advance' ]
+}
+PASS campaign observe
+TASK CONTEXT advance {
+  phase: 'science',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe'
+  ],
+  buttons: [ 'observe', 'advance' ]
+}
+PASS campaign advance
+TASK CONTEXT isolate {
+  phase: 'eclipse',
+  context: {
+    room: 'power_room',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 7.4 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance'
+  ],
+  buttons: [ 'observe', 'advance' ]
+}
+PASS campaign isolate
+TASK CONTEXT spare {
+  phase: 'eclipse',
+  context: {
+    room: 'workshop',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 18 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate'
+  ],
+  buttons: [ 'isolate' ]
+}
+PASS campaign spare
+TASK CONTEXT fuse {
+  phase: 'eclipse',
+  context: {
+    room: 'power_room',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 7.4 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare'
+  ],
+  buttons: [ 'spare' ]
+}
+PASS campaign fuse
+TASK CONTEXT restore {
+  phase: 'eclipse',
+  context: {
+    room: 'power_room',
+    near: true,
+    atTelescope: false,
+    atAirlock: false
+  },
+  position: { x: 0.9, z: 7.4 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse'
+  ],
+  buttons: [ 'restore' ]
+}
+PASS campaign restore
+TASK CONTEXT eclipse-end {
+  phase: 'eclipse',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse',
+    'restore'
+  ],
+  buttons: [ 'restore' ]
+}
+PASS campaign eclipse-end
+TASK CONTEXT transmit {
+  phase: 'downlink',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse',
+    'restore',       'eclipse-end'
+  ],
+  buttons: [ 'return' ]
+}
+PASS campaign transmit
+TASK CONTEXT return {
+  phase: 'downlink',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse',
+    'restore',       'eclipse-end',
+    'transmit'
+  ],
+  buttons: [ 'transmit' ]
+}
+PASS campaign return
+TASK CONTEXT secure {
+  phase: 'return',
+  context: { room: 'lab', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 23.3 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse',
+    'restore',       'eclipse-end',
+    'transmit',      'return'
+  ],
+  buttons: [ 'deorbit' ]
+}
+PASS campaign secure
+TASK CONTEXT deorbit {
+  phase: 'return',
+  context: { room: 'cockpit', near: true, atTelescope: false, atAirlock: false },
+  position: { x: 0.9, z: 28.6 },
+  activity: null,
+  done: [
+    'check-power',   'check-cabin',
+    'check-payload', 'launch',
+    'deploy',        'autopilot',
+    'commission',    'rendezvous',
+    'tool',          'suit',
+    'tether',        'depressurize',
+    'install',       'ingress',
+    'calibrate',     'observe',
+    'advance',       'isolate',
+    'spare',         'fuse',
+    'restore',       'eclipse-end',
+    'transmit',      'return',
+    'secure'
+  ],
+  buttons: []
+}
+PASS campaign deorbit
+CAMPAIGN BROWSER PASS 28

@@ -1,0 +1,3 @@
+T-MINUS v5.7.0 STATIC CLIENT
+
+Offline modes run on static hosting. Network expedition (/expedition.html) and the legacy arena (/online.html) require the separate Node server package. Set Server Endpoint to wss://YOUR-HOST/ws and configure ALLOWED_ORIGINS on that server. See DEPLOY.md in the source package.

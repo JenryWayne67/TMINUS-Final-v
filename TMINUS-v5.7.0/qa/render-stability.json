@@ -1,0 +1,234 @@
+{
+  "method": "six actual WebGL match resets, 120 role handoffs, cached original rigs; physical GPU memory unavailable; source buffer estimates",
+  "samples": [
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 191,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 431,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.2874735267895415,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20426111947406184,
+          "ground": 0.22
+        }
+      ]
+    },
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 227,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 429,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.19864418130061012,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20426667814342112,
+          "ground": 0.22
+        }
+      ]
+    },
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 204,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 429,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.2874735267895415,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20426111947406184,
+          "ground": 0.22
+        }
+      ]
+    },
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 204,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 429,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.2874735267895415,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20426111947406184,
+          "ground": 0.22
+        }
+      ]
+    },
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 204,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 429,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.2874735267895415,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20411458470478602,
+          "ground": 0.22
+        }
+      ]
+    },
+    {
+      "fps": 0,
+      "resolution": 1,
+      "drawCalls": 488,
+      "triangles": 131523,
+      "geometries": 204,
+      "textures": 25,
+      "geometryBytes": 5901752,
+      "textureBytes": 9699344,
+      "materials": 429,
+      "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+      "rigs": [
+        {
+          "species": "frog",
+          "legs": 2,
+          "minY": 0.2874735267895415,
+          "ground": 0.22
+        },
+        {
+          "species": "robot",
+          "legs": 2,
+          "minY": 0.21999999999999997,
+          "ground": 0.22
+        },
+        {
+          "species": "bee",
+          "legs": 2,
+          "minY": 0.19953011165304135,
+          "ground": 0.22
+        },
+        {
+          "species": "flamingo",
+          "legs": 2,
+          "minY": 0.20426111947406184,
+          "ground": 0.22
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,27 @@
+{
+  "method": "actual WebGL scenes, keyboard walk, all task UI and fuse puzzle; station position fixtures and explicit fixed-step timer advance",
+  "checks": [
+    "orbital real interior walking",
+    "check-power",
+    "check-cabin",
+    "check-payload",
+    "launch",
+    "deploy",
+    "autopilot",
+    "commission",
+    "calibrate",
+    "observe",
+    "advance",
+    "isolate",
+    "spare",
+    "fuse",
+    "restore",
+    "eclipse-end",
+    "transmit",
+    "return",
+    "secure",
+    "deorbit",
+    "orbital successful real scene debrief"
+  ],
+  "errors": []
+}

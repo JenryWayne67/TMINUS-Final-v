@@ -1,0 +1,24 @@
+✔ cluster restarts a crashed room worker and reconnects the durable reserved seat (10546.45457ms)
+✔ sixteen expedition WebSockets share detailed mission state and recover rooms plus career after restart (3479.474693ms)
+✔ matchmaking balances open specialist seats and does not merge legacy arena with expedition rooms (114.516603ms)
+✔ shared motor accelerates, brakes, jumps once per press and respects swept walls (6.417121ms)
+✔ suit movement preserves tether, avoids the physical hull and consumes/refills oxygen (22.663709ms)
+✔ online weapons use shared ammo, reload, pellet damage, shields and team rules (113.693267ms)
+✔ Raider can repair exterior panels with server suit oxygen, range and spare validation (55.621868ms)
+✔ two-bone IK reaches a foot target without changing bone lengths or model origin (4.765755ms)
+✔ model grounding uses the actual rotated mesh bounds on a parent-space shelf (2.815417ms)
+✔ preferences clamp corrupt storage values and preserve independent audio and motion controls (1.508678ms)
+✔ memory estimate counts shared buffers and maps once (1.222984ms)
+✔ short jump and fire presses survive a release before the next server tick (49.669198ms)
+✔ flight turret damages opposing hulls, respects defensive abilities, and emits authoritative shots (1.748638ms)
+✔ surface abilities recharge and role handoffs preserve an airborne motor (3.209708ms)
+✔ height-aware camera boom clears low gear and stops at the elevated hull (0.707616ms)
+✔ campaign telemetry preserves a task button and its focus target across updates (1023.222155ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17972.984697

@@ -1,0 +1,56 @@
+{
+  "engine": "chromium",
+  "method": "real browser inputs; explicit stage and position fixtures",
+  "checks": [
+    "account registration through browser UI",
+    "browser creates room",
+    "match starts",
+    "quick Space press jumps",
+    "jump lands",
+    "sidearm selected",
+    "quick mouse click fires authoritative sidearm",
+    "surface reload refills magazine",
+    "scatter blaster selected",
+    "middle mouse throws grenade",
+    "authoritative grenade fuse explodes",
+    "original weapon HUD renders online",
+    "Raider handoff",
+    "X enters actual flight EVA",
+    "EVA vertical controls move server suit",
+    "E removes a real exterior plate",
+    "held E installs the exterior replacement",
+    "exterior repair consumes one authoritative spare",
+    "X returns through airlock",
+    "accessible settings apply in real browser",
+    "all loaded crew rigs have two grounded legs"
+  ],
+  "errors": [],
+  "metrics": {
+    "render": {
+      "frame": 67,
+      "calls": 23,
+      "triangles": 6036,
+      "points": 900,
+      "lines": 0
+    },
+    "memory": {
+      "geometries": 689,
+      "textures": 5
+    },
+    "geometryBytes": 3887848,
+    "textureBytes": 5789014,
+    "materials": 367,
+    "method": "source geometry buffers + RGBA texture mip estimate; excludes driver overhead",
+    "avatars": [
+      {
+        "species": "flamingo",
+        "legs": 2
+      },
+      {
+        "species": "flamingo",
+        "legs": 2
+      }
+    ],
+    "phase": "flight"
+  }
+}

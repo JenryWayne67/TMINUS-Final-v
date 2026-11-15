@@ -1,0 +1,11 @@
+{
+  "version": "5.7.0",
+  "entry": "t-minus-v5.7.0.js",
+  "missions": [
+    "First Orbital Flight",
+    "Restore the Observatory"
+  ],
+  "phase": "Five-phase implementation release",
+  "release_type": "node-server-plus-static-client",
+  "notes": "Original modes retained. Shared construction, flight, FPS combat, EVA, delivery, recoverable accounts, durable room workers, TLS and accessibility settings. See QA_REPORT.md for verified automated/browser results and remaining human/hardware/public-hosting field acceptance."
+}

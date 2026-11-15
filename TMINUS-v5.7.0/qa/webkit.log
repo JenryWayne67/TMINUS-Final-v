@@ -1,0 +1,17 @@
+Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+PASS account registration through browser UI
+PASS browser creates room
+PASS match starts
+PASS quick Space press jumps
+PASS jump lands
+PASS sidearm selected
+PASS quick mouse click fires authoritative sidearm
+PASS surface reload refills magazine
+PASS scatter blaster selected
+PASS middle mouse throws grenade
+PASS authoritative grenade fuse explodes
+PASS Raider handoff
+PASS X enters actual flight EVA
+PASS X returns through airlock
+METRICS {"render":{"frame":45,"calls":36,"triangles":6812,"points":900,"lines":0},"memory":{"geometries":689,"textures":6},"geometryBytes":3895528,"textureBytes":5789014,"materials":368,"method":"source geometry buffers + RGBA texture mip estimate; excludes driver overhead","avatars":[{"species":"flamingo","legs":2},{"species":"flamingo","legs":2}],"phase":"flight"}
+FEATURES PASS webkit 18

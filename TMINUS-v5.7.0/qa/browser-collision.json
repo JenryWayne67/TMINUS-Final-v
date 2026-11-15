@@ -1,0 +1,15 @@
+{
+  "method": "real keyboard input in actual WebGL; completed-ship phase fixture",
+  "start": [
+    12,
+    0.22,
+    12
+  ],
+  "end": [
+    12,
+    0.22,
+    -3.0499999999999963
+  ],
+  "distance": 15.049999999999997,
+  "errors": []
+}

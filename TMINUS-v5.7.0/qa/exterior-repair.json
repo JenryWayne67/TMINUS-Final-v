@@ -1,0 +1,11 @@
+{
+  "method": "actual WebGL and browser E input; flight/damaged-panel/position fixtures; server work timing and spare accounting",
+  "checks": [
+    "join",
+    "start",
+    "exit airlock",
+    "real E removes exterior plate",
+    "real held E completes plate replacement"
+  ],
+  "errors": []
+}

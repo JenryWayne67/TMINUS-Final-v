@@ -1,0 +1,37 @@
+{
+  "name": "t-minus-orbital-crew",
+  "version": "5.7.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:integration": "node tests/runtime.integration.mjs",
+    "build": "node build.mjs",
+    "dev": "node server/start.mjs",
+    "preview": "node server/start.mjs",
+    "test:release": "node --test tests/phase4.test.mjs tests/phase5.test.mjs tests/phase5-integration.test.mjs tests/expedition-network.test.mjs tests/expedition-sockets.test.mjs",
+    "dev:offline": "node dev-server.mjs",
+    "start": "node server/start.mjs",
+    "test:multiplayer": "node --test tests/phase5.test.mjs tests/phase5-integration.test.mjs tests/expedition-network.test.mjs tests/expedition-sockets.test.mjs",
+    "test:browser": "node tests/browser-gameplay.mjs && node tests/browser-collision.mjs && node tests/browser-features.mjs && node tests/browser-eva-repair.mjs",
+    "test:load": "node tests/load-test.mjs",
+    "start:cluster": "node server/cluster-start.mjs",
+    "test:full-match": "node tests/full-network-match.mjs",
+    "test:features": "node tests/browser-features.mjs",
+    "test:campaign-browser": "node tests/browser-campaign.mjs",
+    "test:stability": "node tests/browser-stability.mjs",
+    "package:release": "python3 scripts/package-release.py"
+  },
+  "optionalDependencies": {
+    "linkedom": "0.18.12"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
+  }
+}

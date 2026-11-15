@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tminus-online-v5
+    runtime: node
+    # Select an always-on plan appropriate for your expected player load.
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      # ALLOWED_ORIGINS may be set for a separate Netlify frontend.

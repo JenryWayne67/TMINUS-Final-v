@@ -1,0 +1,29 @@
+PASS browser creates expedition room
+PASS two real browser clients share a room
+PASS ready check and host start
+PASS real WASD moves authoritative character
+PASS open specialist seat can be selected
+PASS role can switch back
+PASS E picks up a real shared spacecraft part
+PASS E snaps aligned module into place
+PASS held work completes three server-timed fasteners
+PASS Pilot launches through a real route button
+PASS Engineer role handoff in flight
+PASS Engineer console repairs an authoritative fault
+PASS Gunner handoff in flight
+PASS Gunner fire destroys flight debris
+PASS flight reaches Planet B through the mission transition
+PASS Raider handoff on Planet B
+PASS real hold scans, stabilizes and extracts science
+PASS G drops sample at the player
+PASS E recovers a dropped sample
+PASS sample can be stowed at the spacecraft
+PASS Pilot can take the return role
+PASS N commits return with reserved fuel
+PASS return reaches Planet A
+PASS delivery role handoff
+PASS only receiving-station delivery awards a score
+PASS crew can finish after delivering cargo
+PASS authoritative results and debrief
+PASS reload reconnects the reserved session
+BROWSER PASS 33

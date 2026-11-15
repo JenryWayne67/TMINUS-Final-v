@@ -1,0 +1,8 @@
+PASS join
+PASS start
+PASS exit airlock
+ACTION remove-panel port { ok: true, message: 'Damaged plate removed' } { x: -14, y: 7.408, z: 2.8800000000000003, eva: true, health: 30 }
+PASS real E removes exterior plate
+ACTION work undefined { ok: true, message: 'Work target acquired' } { x: -14, y: 7.408, z: 2.8800000000000003, eva: true, health: 30 }
+PASS real held E completes plate replacement
+EVA REPAIR PASS

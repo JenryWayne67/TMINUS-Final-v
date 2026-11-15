@@ -1,0 +1,14 @@
+services:
+  tminus:
+    build: .
+    ports:
+      - "8095:8095"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8095
+      DATA_DIR: /app/data
+    volumes:
+      - tminus-data:/app/data
+    restart: unless-stopped
+volumes:
+  tminus-data:
