@@ -156,11 +156,11 @@ export function createHeldWeapon() {
     const m = weaponTemplates[i].clone(true);
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.tminusAssetShared = true; if (o.geometry) o.geometry.userData.tminusAssetShared = true; for (const mm of [o.material].flat()) if (mm) mm.userData.tminusAssetShared = true; } });
     const holder = new THREE.Group(); holder.add(m);
-    fitToSize(m, i === 1 ? 0.42 : 0.7);
+    fitToSize(m, i === 1 ? 0.62 : 1.0);   // sized for the chunky crew gloves so it reads in third person
     // Avatars face +Z; the blaster muzzle is modelled toward -Z, so turn it to point where the crew member faces.
     holder.rotation.y = Math.PI;
     // Grip sits slightly behind the model centre: shift so the palm holds the handle.
-    holder.position.set(0, 0.02, 0.12);
+    holder.position.set(0, 0.06, 0.34);
     holder.visible = false; g.add(holder); slots[i] = holder;
     return holder;
   }
