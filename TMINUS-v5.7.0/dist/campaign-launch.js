@@ -100,6 +100,7 @@ const BEATS = [
   {t: 17.5, label: 'STAGING', title: 'CORE STAGE SEPARATION', copy: () => 'Spacecraft flying free on its own engine'},
   {t: 20, label: 'ORBIT', title: 'ORBIT INSERTION', copy: d => `${d.wingNote} · ${d.radioNote}`},
 ];
+export const BUILD_DURATION = 11;
 export const LAUNCH_DURATION = 24;
 
 export function playLaunchCinematic(container, {design = {}, evaluation = null, mission = null, skippable = true} = {}) {
@@ -139,6 +140,14 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
       const s = 0.75; craft.scale.setScalar(s); craft.rotation.set(Math.PI / 2, 0, 0); craft.position.set(0, 2.5 * s, -1.4 * s);
     } catch { craft = new THREE.Group(); craftHolder.add(craft); cyl(craft, 1.2, 1.2, 3.4, '#eef1f4', 0, 1.7, 0); }
     craftFlames.forEach(f => (f.visible = false));
+    // Robotic assembly (same idea as FAST ASSEMBLY in the crew mode): modules arrive one by one on a horizontal jig.
+    const uprightPose = {rx: craft.rotation.x, pos: craft.position.clone()};
+    const parts = craft.children.map(o => ({o, home: o.position.clone()}));
+    const jig = new THREE.Group(); jig.position.set(16, 0, 8); scene.add(jig);
+    box(jig, 7, 0.5, 2.2, '#4a4f66', 0, 0.25, 0); for (const x of [-3, 0, 3]) box(jig, 0.3, 1.0, 1.6, '#f4c542', x, 0.9, 0);
+    const arm = new THREE.Group(); arm.position.set(0, 0, -3.4); jig.add(arm);
+    cyl(arm, 0.6, 0.8, 0.6, '#3a3f52', 0, 0.3, 0); const shoulder = new THREE.Group(); shoulder.position.y = 0.7; arm.add(shoulder);
+    const boom = box(shoulder, 0.35, 0.35, 4.2, '#f6a052', 0, 0, 2.1); const tip = mesh(shoulder, new THREE.SphereGeometry(0.28, 12, 8), toon('#8ff0d0', 0.6), 0, 0, 4.2); void boom;
     // Equipment that shows the trade-offs: expanded wings are longer, high-gain antenna is a bigger dish.
     const wings = new THREE.Group(); craftHolder.add(wings);
     const wingLen = design.array === 'expanded' ? 5.2 : 3.4;
@@ -169,7 +178,7 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
       radioNote: design.radio === 'highgain' ? 'High-gain dish deployed' : 'Standard antenna deployed',
     };
     const hud = {small: wrap.querySelector('.cp-launch-hud small'), b: wrap.querySelector('.cp-launch-hud b'), span: wrap.querySelector('.cp-launch-hud span'), bar: wrap.querySelector('.cp-launch-bar i'), count: wrap.querySelector('.cp-launch-count')};
-    let beat = -1, t = 0, last = performance.now(), done = false, raf = 0;
+    let beat = -1, clock = 0, last = performance.now(), done = false, raf = 0, buildBeat = false, buildDone = false;
     const boosterDrop = booster.sides.map(() => ({v: new THREE.Vector3(), spin: 0})), coreDrop = {v: new THREE.Vector3()};
     let detachedSides = false, detachedCore = false, fairingOff = false;
     const craftBase = booster.top;    // spacecraft sits on the interstage
@@ -179,7 +188,7 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
 
     function finish() {
       if (done) return; done = true; cancelAnimationFrame(raf);
-      removeEventListener('resize', resize); removeEventListener('keydown', onKey, true);
+      removeEventListener('resize', resize); removeEventListener('keydown', onKey, true); removeEventListener('keydown', onDown); removeEventListener('keyup', onUp);
       wrap.classList.add('fade');
       setTimeout(() => {
         smoke.dispose();
@@ -192,14 +201,81 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
     wrap.querySelector('.cp-launch-skip')?.addEventListener('click', finish);
 
     const tmp = new THREE.Vector3(), look = new THREE.Vector3();
+    // ---- Build bay gameplay: buy each chosen piece at the shop kiosk, then bolt it onto the jig. ----
+    const shop = new THREE.Group(); shop.position.set(16, 0, -6); scene.add(shop);
+    box(shop, 6, 2.6, 0.4, '#2b3245', 0, 1.3, -1.2); box(shop, 6.4, 0.3, 1.6, '#f6a052', 0, 2.75, -0.6);
+    box(shop, 5, 0.9, 1.2, '#565c7a', 0, 0.45, 0.2);
+    const shopSign = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#0b1220'; g.fillRect(0, 0, 256, 64); g.fillStyle = '#ffd27a'; g.font = '800 38px sans-serif'; g.textAlign = 'center'; g.fillText('PARTS SHOP', 128, 46); const m = mesh(shop, new THREE.PlaneGeometry(3, 0.75), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(c)}), 0, 3.4, -0.58); return m; })(); void shopSign;
+    const P = evalData.parts || {};
+    const items = [
+      {key: 'battery', part: P.battery, make: g => { box(g, 0.9, 0.6, 0.7, '#3b4058', 0, 0, 0); box(g, 0.92, 0.08, 0.5, '#7dffb5', 0, 0.2, 0, ); }},
+      {key: 'array', part: P.array, make: g => { box(g, 1.4, 0.15, 0.9, '#2c5581', 0, 0, 0); }},
+      {key: 'instrument', part: P.instrument, make: g => { cyl(g, 0.35, 0.45, 0.9, '#d5dbe4', 0, 0, 0, 16); cyl(g, 0.25, 0.25, 0.1, '#8ff0d0', 0, 0.5, 0, 16); }},
+      {key: 'radio', part: P.radio, make: g => { mesh(g, new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), toon('#d9dee6'), 0, 0, 0).rotation.x = Math.PI; }},
+    ].filter(i => i.part);
+    const mountAt = [[-1.6, 1.4, 1.3], [0, 2.2, 0], [1.6, 1.4, 1.3], [0.4, 2.3, -1.6]];
+    items.forEach((it, i) => { it.crate = new THREE.Group(); it.make(it.crate); it.crate.position.set(-1.8 + i * 1.2, 1.25, 0.2); shop.add(it.crate); it.mount = new THREE.Vector3(...mountAt[i % 4]); it.bolt = 0; it.state = 'shop'; });
+    let budgetLeft = evalData.budget ?? 100, stepIdx = 0, frameClock = 0, raiseClock = -1, holdE = false, deliverT = 0;
+    const onDown = e => { if (e.key === 'e' || e.key === 'E') { holdE = true; if (!e.repeat) pressE(); } };
+    const onUp = e => { if (e.key === 'e' || e.key === 'E') holdE = false; };
+    addEventListener('keydown', onDown); addEventListener('keyup', onUp);
+    canvas.addEventListener('pointerdown', () => { holdE = true; pressE(); }); addEventListener('pointerup', () => (holdE = false));
+    function pressE() {
+      const it = items[stepIdx]; if (!it || frameClock < 3 || it.state !== 'shop') return;
+      // Buying spends the mission budget; the robot arm carries the piece to the jig.
+      budgetLeft -= it.part.cost; it.state = 'deliver'; deliverT = 0;
+      const w = it.crate.getWorldPosition(new THREE.Vector3()); shop.remove(it.crate); scene.add(it.crate); it.crate.position.copy(w); it.from = w.clone();
+    }
+    function buildStep(bt, dt) {
+      buildBeat = true;
+      fairing.forEach(f => (f.visible = false)); wings.visible = dish.visible = false; hook.visible = cable.visible = false;
+      frameClock += dt;
+      const it = items[stepIdx];
+      if (raiseClock < 0) {
+        // 1) Robots frame the structure on the jig (horizontal), module by module.
+        craftHolder.position.set(jig.position.x, 1.2, jig.position.z); craft.rotation.set(0, Math.PI / 2, 0); craft.position.set(0, 0.2, 0);
+        const per = 3 / Math.max(1, parts.length);
+        parts.forEach((p, i) => { const k = (frameClock - i * per) / per; p.o.visible = k > 0; const e = Math.min(1, Math.max(0, k)); p.o.position.copy(p.home); p.o.position.y += (1 - (1 - Math.pow(1 - e, 3))) * 5; if (k > 0.6 && k < 0.6 + dt / per * 1.5) smoke.emit(p.o.getWorldPosition(tmp), '#ffb347', 0.5, 0.1, 2); });
+        let msg;
+        if (frameClock < 3) msg = ['STRUCTURE', 'ROBOTS FRAMING THE HULL', 'Structure and propulsion modules arriving'];
+        else if (!it) { raiseClock = 0; msg = ['ASSEMBLY', 'SPACECRAFT COMPLETE', 'Raising to vertical']; }
+        else if (it.state === 'shop') { msg = ['PARTS SHOP · BUDGET ' + budgetLeft, 'PRESS E · BUY ' + it.part.name.toUpperCase(), `${it.part.cost} credits · ${it.part.mass} kg${it.part.watts ? ' · ' + it.part.watts + ' W' : ''}${it.part.wh ? ' · ' + it.part.wh + ' Wh' : ''}`]; it.crate.rotation.y += dt; it.crate.position.y = 1.25 + Math.sin(frameClock * 3) * 0.06; }
+        else if (it.state === 'deliver') {
+          deliverT += dt / 1.1; const k = Math.min(1, deliverT), target = jig.localToWorld(it.mount.clone());
+          it.crate.position.lerpVectors(it.from, target, k); it.crate.position.y += Math.sin(k * Math.PI) * 3; shoulder.lookAt(it.crate.position);
+          if (k >= 1) it.state = 'bolt';
+          msg = ['DELIVERY', 'ROBOT ARM PLACING ' + it.part.name.toUpperCase(), 'Budget left ' + budgetLeft];
+        } else if (it.state === 'bolt') {
+          if (holdE) { it.bolt = Math.min(1, it.bolt + dt / 1.3); if (Math.random() < dt * 30) smoke.emit(it.crate.getWorldPosition(tmp), '#ffd27a', 0.4, 0.08, 2.5); }
+          if (it.bolt >= 1) { it.state = 'done'; stepIdx++; }
+          msg = ['HANDS-ON ASSEMBLY', 'HOLD E · BOLT ' + it.part.name.toUpperCase() + ' · ' + Math.round(it.bolt * 100) + '%', 'Fasten it to the spacecraft frame'];
+        }
+        hud.small.textContent = msg[0]; hud.b.textContent = msg[1]; hud.span.textContent = msg[2];
+        const focus = it && it.state === 'shop' ? shop.position : jig.position;
+        camera.position.lerp(tmp.set(focus.x + 10, 6.5, focus.z + 9), 1 - Math.exp(-dt * 3)); look.lerp(new THREE.Vector3(focus.x, 1.4, focus.z), 1 - Math.exp(-dt * 3)); camera.lookAt(look);
+        return false;
+      }
+      // 2) Tilt upright and crane it over the launcher, matching the stacking shot that follows.
+      raiseClock += dt; const k = Math.min(1, raiseClock / 3), e = k * k * (3 - 2 * k);
+      items.forEach(i => (i.crate.visible = false));
+      parts.forEach(p => { p.o.visible = true; p.o.position.copy(p.home); });
+      craft.rotation.set(uprightPose.rx * e, Math.PI / 2 * (1 - e), 0); craft.position.lerpVectors(new THREE.Vector3(0, 0.2, 0), uprightPose.pos, e);
+      craftHolder.position.set(jig.position.x * (1 - e), 1.2 + (craftBase + 12 - 1.2) * e, jig.position.z * (1 - e));
+      hud.small.textContent = 'ASSEMBLY'; hud.b.textContent = 'RAISING TO VERTICAL'; hud.span.textContent = 'Budget left ' + budgetLeft + ' credits';
+      camera.position.set(30, 10 + e * 12, 30); camera.lookAt(craftHolder.position.x, craftHolder.position.y, craftHolder.position.z);
+      return k >= 1;
+    }
     function frame(now) {
       if (done) return;
       raf = requestAnimationFrame(frame);
-      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now; t += dt;
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now; clock += dt;
+      hud.bar.style.width = buildDone ? Math.min(100, (clock - BUILD_DURATION) / LAUNCH_DURATION * 100) + '%' : Math.min(100, (stepIdx / Math.max(1, items.length)) * 100) + '%';
+      if (!buildDone) { buildDone = buildStep(clock, dt); smoke.tick(dt); renderer.render(scene, camera); if (!buildDone) return; clock = BUILD_DURATION; }
+      if (buildBeat) { buildBeat = false; jig.visible = false; craft.rotation.x = uprightPose.rx; craft.position.copy(uprightPose.pos); parts.forEach(p => { p.o.visible = true; p.o.position.copy(p.home); }); }
+      const t = clock - BUILD_DURATION;
       // Beat text.
       let b = 0; for (let i = 0; i < BEATS.length; i++) if (t >= BEATS[i].t) b = i;
       if (b !== beat) { beat = b; hud.small.textContent = BEATS[b].label; hud.b.textContent = BEATS[b].title; hud.span.textContent = BEATS[b].copy(data); }
-      hud.bar.style.width = Math.min(100, t / LAUNCH_DURATION * 100) + '%';
       // Countdown digits.
       if (t >= 5 && t < 9) { const n = Math.max(0, Math.ceil(9 - t) - 0); hud.count.hidden = false; hud.count.textContent = n > 0 ? 'T−' + n : 'IGNITION'; hud.b.textContent = n > 0 ? 'T−' + n : 'IGNITION'; } else hud.count.hidden = true;
 
