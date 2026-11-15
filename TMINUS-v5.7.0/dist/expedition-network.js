@@ -14,6 +14,8 @@ export const CHECK_STATIONS = [
   { id: "power", role: 1, x: 3 * SHIP_SCALE, z: 5.7 * SHIP_SCALE },
   { id: "pressure", role: 1, x: -3 * SHIP_SCALE, z: 5.7 * SHIP_SCALE },
 ];
+// Parts shop kiosk on each pad (pad-local coordinates).
+export const SHOP_POINT = { x: -15, z: 22 };
 export const SYSTEM_STATIONS = [
   { id: "reactor", x: -3.8, z: -4.2 },
   { id: "coolant", x: -3.8, z: 3 },

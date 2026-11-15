@@ -103,7 +103,8 @@ const BEATS = [
 export const BUILD_DURATION = 11;
 export const LAUNCH_DURATION = 24;
 
-export function playLaunchCinematic(container, {design = {}, evaluation = null, mission = null, skippable = true} = {}) {
+// Shared by single player (build bay + launch) and multiplayer (launch only, synced to the server clock via startAt).
+export function playLaunchCinematic(container, {design = {}, evaluation = null, mission = null, skippable = true, build = true, startAt = 0, livery: liveryColor = '#f6a052', title = ''} = {}) {
   return new Promise(resolve => {
     const wrap = document.createElement('div'); wrap.className = 'cp-launch';
     wrap.innerHTML = `<canvas></canvas><div class="cp-launch-hud"><small></small><b></b><span></span><div class="cp-launch-bar"><i></i></div></div>${skippable ? '<button class="cp-launch-skip" type="button">SKIP ▸▸</button>' : ''}<div class="cp-launch-count" hidden></div>`;
@@ -122,7 +123,7 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
     const ocean = mesh(scene, new THREE.CircleGeometry(900, 48, 0, Math.PI * 0.7), toon('#3f78b5'), 0, -1.15, 0); ocean.rotation.x = -Math.PI / 2; ocean.position.z = -120;
     const {pad, arms, crane, hook, cable} = buildPad(); scene.add(pad);
     const evalData = evaluation || {mass: 640, parts: {}};
-    const livery = '#f6a052';
+    const livery = liveryColor;
     const booster = buildBooster(livery); scene.add(booster.stack);
     // The player's spacecraft, carrying the equipment they picked.
     const craftHolder = new THREE.Group(); scene.add(craftHolder);
@@ -178,7 +179,7 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
       radioNote: design.radio === 'highgain' ? 'High-gain dish deployed' : 'Standard antenna deployed',
     };
     const hud = {small: wrap.querySelector('.cp-launch-hud small'), b: wrap.querySelector('.cp-launch-hud b'), span: wrap.querySelector('.cp-launch-hud span'), bar: wrap.querySelector('.cp-launch-bar i'), count: wrap.querySelector('.cp-launch-count')};
-    let beat = -1, clock = 0, last = performance.now(), done = false, raf = 0, buildBeat = false, buildDone = false;
+    let beat = -1, clock = build ? 0 : BUILD_DURATION + Math.max(0, startAt), last = performance.now(), done = false, raf = 0, buildBeat = !build, buildDone = !build;
     const boosterDrop = booster.sides.map(() => ({v: new THREE.Vector3(), spin: 0})), coreDrop = {v: new THREE.Vector3()};
     let detachedSides = false, detachedCore = false, fairingOff = false;
     const craftBase = booster.top;    // spacecraft sits on the interstage
@@ -202,7 +203,7 @@ export function playLaunchCinematic(container, {design = {}, evaluation = null, 
 
     const tmp = new THREE.Vector3(), look = new THREE.Vector3();
     // ---- Build bay gameplay: buy each chosen piece at the shop kiosk, then bolt it onto the jig. ----
-    const shop = new THREE.Group(); shop.position.set(16, 0, -6); scene.add(shop);
+    const shop = new THREE.Group(); shop.position.set(16, 0, -6); scene.add(shop); shop.visible = build;
     box(shop, 6, 2.6, 0.4, '#2b3245', 0, 1.3, -1.2); box(shop, 6.4, 0.3, 1.6, '#f6a052', 0, 2.75, -0.6);
     box(shop, 5, 0.9, 1.2, '#565c7a', 0, 0.45, 0.2);
     const shopSign = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#0b1220'; g.fillRect(0, 0, 256, 64); g.fillStyle = '#ffd27a'; g.font = '800 38px sans-serif'; g.textAlign = 'center'; g.fillText('PARTS SHOP', 128, 46); const m = mesh(shop, new THREE.PlaneGeometry(3, 0.75), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(c)}), 0, 3.4, -0.58); return m; })(); void shopSign;

@@ -8,6 +8,7 @@ import {EVA} from './spacewalk-core.js';
 import * as THREE from "./vendor/three.module.js";
 import { FACTIONS, FLAG_SITES, UPGRADES, scanFraction } from "./science-match.js";
 import { createPartModel } from "./part-model.js";
+import { playLaunchCinematic } from "./campaign-launch.js";
 import { createFlagModel, createEquipmentCrate, createHeldWeapon, holdPoint, placeAtWorld } from "./held-items.js";
 import {
   createExpedition,
@@ -25,6 +26,7 @@ import {
   spaceBaseFor,
   shelfPoint,
   STOW_POINT,
+  SHOP_POINT,
   RECEIVER_POINT,
   CHECK_STATIONS,
   SYSTEM_STATIONS,
@@ -135,7 +137,20 @@ function tickBursts(dt) {
     if (m.userData.life <= 0) { m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); bursts.splice(i, 1); }
   }
 }
-let cine = null, cineLastPhase = "";
+let cine = null, cineLastPhase = "", launchSeq = null;
+// Same stack-and-launch sequence as single player, synced to the server's launch countdown.
+function startLaunchSequence(s, p, own) {
+  if (launchSeq) return;
+  const startAt = Math.max(0, 24 - (own.launchLeft ?? 24));
+  document.body.classList.add("cine-active");
+  launchSeq = playLaunchCinematic(document.body, { build: false, startAt, livery: COLORS[p.team], evaluation: { mass: Math.round((own.wetMass || 640)) }, design: { array: own.upgrades.includes("cargo") ? "expanded" : "standard", radio: "standard" } })
+    .then(() => {
+      launchSeq = null;
+      // Skipped early: hold on a banner until the server releases the flight.
+      if (mission()?.phase === "launch") startCine("takeoff", "A", "LAUNCHING", "Waiting for orbit insertion");
+      else document.body.classList.remove("cine-active");
+    });
+}
 // Cinematic overlay (DOM) shared by take-off and landing.
 function cineBanner() {
   let el = document.getElementById("cine-banner");
@@ -810,6 +825,12 @@ function makeShip(team) {
   ring(receiver, 0, 0.22, 0, 2.3, COLORS[team]);
   ball(receiver, 0, 1.8, 0, 0.5, COLORS[team]);
   const stow = ring(g, STOW_POINT.x, 0.035, STOW_POINT.z, 1.7, "#c6e8a9");
+  // Parts shop kiosk: each role buys its modules here from the team credit pool before picking them up.
+  const kiosk = new THREE.Group(); kiosk.position.set(SHOP_POINT.x, 0, SHOP_POINT.z); groundFixtures.add(kiosk);
+  box(kiosk, 0, 1.3, -1.0, 4.4, 2.6, 0.35, "#2b3245"); box(kiosk, 0, 2.75, -0.5, 4.8, 0.3, 1.5, COLORS[team]);
+  box(kiosk, 0, 0.5, 0.1, 3.6, 1.0, 1.0, "#565c7a"); box(kiosk, 0, 1.05, 0.1, 3.7, 0.06, 1.1, "#ffd27a");
+  const kioskSign = stationLabel("PARTS SHOP", COLORS[team]); kioskSign.scale.setScalar(1.6); kioskSign.position.set(0, 3.45, -0.4); kiosk.add(kioskSign);
+  ring(kiosk, 0, 0.03, 1.6, 1.4, "#ffd27a");
   const load = ring(g, 0, 0.035, -17, 1.7, "#c6e8a9");
   const interior = new THREE.Group();
   g.add(interior);
@@ -945,6 +966,15 @@ function objective() {
         detail: "Switch to an open role to help",
         op: null,
       };
+    if (part.stage === "shelf" && !part.purchased) {
+      return {
+        ...SHOP_POINT,
+        title: "Buy " + part.name,
+        detail: `${Math.ceil(d(SHOP_POINT))} m · E at the PARTS SHOP · ${part.price} of ${s.credits} team credits`,
+        op: "buy",
+        part: part.id,
+      };
+    }
     if (part.stage === "shelf") {
       const target = shelfPoint(model, part);
       return {
@@ -1019,6 +1049,8 @@ function objective() {
       detail: "Pilot: engines 68–78 · Engineer: power 45–65, pressure 95–105",
     };
   }
+  if (s.phase === "launch")
+    return { title: "Launch in progress", detail: `Lift-off sequence · ${Math.ceil(s.launchLeft || 0)} s to flight` };
   if (s.phase === "route")
     return {
       title: p.role === 0 ? "Choose a flight route" : "Pilot chooses the route",
@@ -1245,7 +1277,7 @@ function updateHud(s) {
   $("health-fill").style.width = p.hp + "%";
   setHTML(
     "stage-track",
-    ["assembly", "outfit", "route", "flight", "surface", "delivery"]
+    ["assembly", "outfit", "route", "launch", "flight", "surface", "delivery"]
       .map(
         (stage) =>
           `<span class="${stage === m.phase ? "active" : ""}">${stage.toUpperCase()}</span>`,
@@ -1303,7 +1335,7 @@ function updateWorld(s, dt, now) {
   if (cineLastPhase && cineLastPhase !== own.phase && !own.finished) {
     const from = cineLastPhase, to = own.phase;
     if (to === "flight" && from === "surface") startCine("takeoff", "B", "LIFT-OFF FROM PLANET B", `${s.flags.filter((f) => f.state === "onboard" && f.owner === p.team).length} flags aboard · returning to Planet A`);
-    else if (to === "flight" && (from === "route" || from === "outfit")) startCine("takeoff", "A", "LAUNCH", "Clearing the pad · outbound to Planet B");
+    else if (to === "launch") startLaunchSequence(s, p, own);
     else if (from === "flight" && to === "surface") startCine("landing", "B", "TOUCHDOWN · PLANET B", "Find the science flags · hold E for 5 s to claim");
     else if (from === "flight" && to === "delivery") startCine("landing", "A", "HOME · PLANET A", "Unload the flags at the receiver");
   }

@@ -36,7 +36,7 @@ import { movePlanar, recoverPlanar, blocked } from "../dist/motion-physics.js";
 import {
   baseFor,
   spaceBaseFor,
-  shelfPoint,
+  shelfPoint, SHOP_POINT,
   STOW_POINT,
   RECEIVER_POINT,
   CHECK_STATIONS,
@@ -48,6 +48,7 @@ import {
 import { hullBoxes } from "../dist/hull-collision.js";
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+export const LAUNCH_SECONDS = 24;
 const neutral = () => ({ strafe: 0, forward: 0, buttons: 0 });
 const fail = (message) => ({ error: message });
 const ok = (message) => ({ ok: true, message });
@@ -247,7 +248,19 @@ export class ExpeditionMatch extends Match {
     s.selected = p.role;
     let result = false;
     switch (m.op) {
+      case "buy": {
+        // Parts shop on the pad: the team pool pays, the role that owns the part buys it.
+        const q = s.parts.find((x) => x.id === m.part);
+        if (s.phase !== "assembly" || !q || q.owner !== p.role || q.purchased) return fail("Nothing to buy for your role");
+        if (dist(point, SHOP_POINT) > 4) return fail("Walk to the parts shop");
+        if (s.credits < q.price) return fail("Not enough team credits");
+        s.credits -= q.price; q.purchased = true;
+        this.sendEvent(`${this.science.teams[p.team].name} bought ${q.name}`, p.team);
+        result = true;
+        break;
+      }
       case "pick":
+        if (part && !part.purchased && dist(point, shelfPoint(s, part)) <= 3) return fail("Buy it at the parts shop first");
         result =
           part &&
           dist(point, shelfPoint(s, part)) <= 3 &&
@@ -289,6 +302,8 @@ export class ExpeditionMatch extends Match {
         if (p.role !== 0) return fail("The Pilot selects the launch route");
         result = launchFlight(s, m.route);
         if (result) {
+          // Shared launch sequence before the flight: everyone in the crew watches the same countdown.
+          s.phase = "launch"; s.launchLeft = LAUNCH_SECONDS;
           s.flightLeg = "outbound";
           this.stage(p.team);
           this.science.teams[p.team].planet = "space";
@@ -518,6 +533,7 @@ export class ExpeditionMatch extends Match {
       const s = this.missions[team],
         t = this.science.teams[team];
       s.selected = -1;
+      if (s.phase === "launch") { s.launchLeft = Math.max(0, s.launchLeft - dt); if (s.launchLeft <= 0) { s.phase = "flight"; s.flightTime = 0; this.stage(team); } }
       if(s.phase!=='flight'&&!s.finished){for(let i=0;i<4;i++){s.abilityCD[i]=Math.max(0,s.abilityCD[i]-dt);s.altCD[i]=Math.max(0,s.altCD[i]-dt);s.ultimate[i]=Math.min(100,s.ultimate[i]+dt*.8);}for(const k of ['shield','boost','decoy','scanBoost','overdrive'])s[k]=Math.max(0,s[k]-dt);}
       if (s.phase === "flight" && !s.finished) {
         tickSystems(s, dt, team,[spaceBaseFor(team).x+s.shipMotion.x,2,s.shipMotion.z],'space');
@@ -658,7 +674,7 @@ export class ExpeditionMatch extends Match {
         cargoCapacity: s.cargoCapacity,
         flightLeg: s.flightLeg,
         flightTime: s.flightTime,
-        route: s.route,
+        route: s.route, launchLeft: s.launchLeft || 0,
         shipMotion: { ...s.shipMotion },
         hazards: s.hazards.map((h) => ({ ...h })),
         hull: s.hull,

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ExpeditionMatch } from "../server/expedition-match.mjs";
 import { ProgressionStore } from "../server/progression-store.mjs";
 import {
-  shelfPoint,
+  shelfPoint, SHOP_POINT,
   STOW_POINT,
   RECEIVER_POINT,
   CHECK_STATIONS,
@@ -36,10 +36,19 @@ function work(m, p, target, seconds = 2.5) {
   }
   p.input.buttons = 0;
 }
+// Parts are bought at the pad's shop kiosk before they can be picked from the shelf.
+function buy(m, p, part) {
+  const back = { x: p.x, z: p.z };
+  at(p, SHOP_POINT);
+  const r = action(m, p, { op: "buy", part: part.id });
+  at(p, back);
+  return r;
+}
 function build(m, team) {
   const s = m.missions[team];
   for (const part of s.parts) {
     const p = players(m).find((p) => p.team === team && p.role === part.owner);
+    assert.ok(buy(m, p, part).ok, part.id + " buy");
     at(p, shelfPoint(s, part));
     assert.ok(
       action(m, p, { op: "pick", part: part.id }).ok,
@@ -117,7 +126,8 @@ test("16 specialist seats complete shared construction, supplies, checks, travel
     const p = players(m).find((p) => p.team === team && p.role === 0);
     assert.ok(action(m, p, { op: "launch", route: "sheltered" }).ok);
   }
-  step(m, 2100);
+  assert.ok(m.missions.every((s) => s.phase === "launch"), "shared launch sequence first");
+  step(m, 2100 + 24 * 20);
   assert.ok(m.missions.every((s) => s.phase === "surface"));
   for (let team = 0; team < 4; team++) {
     const p = players(m).find((p) => p.team === team && p.role === 3),
@@ -165,6 +175,9 @@ test("remote/replayed construction commands, impossible roles, fake scores and s
     "rack proximity enforced",
   );
   at(p, shelfPoint(m.missions[0], part));
+  assert.ok(action(m, p, { op: "pick", part: part.id }).error, "must buy first");
+  assert.ok(buy(m, p, part).ok);
+  at(p, shelfPoint(m.missions[0], part));
   assert.ok(action(m, p, { op: "pick", part: part.id }).ok);
   assert.ok(
     m.action(p.id, { commandSeq: p.commandSeq, op: "rotate" }).error,
@@ -206,6 +219,7 @@ test("disconnect and server recovery retain role, position, held paid parts, pro
   const m = room16(),
     p = players(m)[0],
     part = m.missions[0].parts[0];
+  buy(m, p, part);
   at(p, shelfPoint(m.missions[0], part));
   action(m, p, { op: "pick", part: part.id });
   const old = { x: p.x, z: p.z, commandSeq: p.commandSeq };
