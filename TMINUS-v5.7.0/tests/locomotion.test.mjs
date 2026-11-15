@@ -12,10 +12,9 @@ test('W alone runs, W+Shift sprints, and sprint is clearly faster than run', () 
 });
 
 test('walking is only for heavy loads, whatever else you do', () => {
-  assert.equal(speedFor({carrying: 'heavy'}), SPEED.walk);
-  assert.equal(speedFor({carrying: 'heavy', sprint: true}), SPEED.walk);
-  assert.equal(speedFor({carrying: 'heavy', crouch: true}), SPEED.walk);
-  assert.ok(SPEED.walk < SPEED.run / 2);
+  assert.equal(speedFor({carrying: 'heavy'}), SPEED.run);
+  assert.equal(speedFor({carrying: 'heavy', sprint: true}), SPEED.run);
+  assert.equal(speedFor({carrying: 'heavy', crouch: true}), SPEED.crouch);
   assert.equal(speedFor({carrying: 'light'}), SPEED.run * LIGHT_CARRY, 'a flag slows you a little but you still run');
   assert.equal(speedFor({carrying: 'light', sprint: true}), SPEED.run * LIGHT_CARRY, 'no sprinting with a flag');
 });
@@ -31,7 +30,7 @@ test('sprint needs forward movement and no aiming; crouch and aim slow you', () 
 test('the firefight uses the same speeds', () => {
   assert.equal(moveSpeed({}), SPEED.run);
   assert.equal(moveSpeed({sprint: true}), SPEED.sprint);
-  assert.equal(moveSpeed({heavy: true}), SPEED.walk);
+  assert.equal(moveSpeed({heavy: true}), SPEED.run);
   assert.equal(moveSpeed({carrying: true}), SPEED.run * LIGHT_CARRY);
   assert.equal(isSprinting({sprint: true, moving: true, forward: true}), true);
 });

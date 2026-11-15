@@ -91,7 +91,7 @@ export async function createCampaignWorld(canvas, callbacks={}) {
   const weight=eva?0:Math.min(1,walkSpeed/2.8);
   avatarLegs.forEach((leg,i)=>leg.rotation.x=Math.sin(walkPhase+i*Math.PI)*.30*weight);
   avatarArms.forEach((arm,i)=>arm.rotation.x=Math.sin(walkPhase+i*Math.PI)*-.22*weight);
-  if(avatarRig.skin){const sk=avatarRig.skin;sk.setState(eva?'idle':stateFor(walkSpeed*1.6,{crouch}),walkSpeed*1.6);sk.mixer.update(dt);sk.ground?.(dt,{grounded:!eva,speed:walkSpeed,floorAt:()=>0});sk.setLook?.(0,first?0:-walker.pitch*.6);}
+  if(avatarRig.skin){const sk=avatarRig.skin;const cs=walkSpeed>3.4?walkSpeed*1.4:walkSpeed;sk.setState(eva?'idle':stateFor(cs,{crouch}),cs);sk.mixer.update(dt);sk.ground?.(dt,{grounded:!eva,speed:walkSpeed,floorAt:()=>0});sk.setLook?.(0,first?0:-walker.pitch*.6);}
   if(!eva)crew.tick(dt,camera);
   footShadow.visible=!eva;
   footShadow.material.opacity=.23*(1-.22*weight);

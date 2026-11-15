@@ -1599,7 +1599,6 @@ function updateWorld(s, dt, now) {
     const seated = s.missions[q.team].phase === "flight" && !q.eva && [0, 2].includes(q.role);
     let animState = stateFor(speed, { carrying: heldKind, crouch: q.crouch, interacting: q.working, airborne: !q.eva && (q.y || 0) > .03 });
     if (seated) animState = "seated";
-    if (a.lastHeld !== heldKind && heldKind !== "none" && a.skin) a.skin.playOnce("pickup", 0.55);
     a.lastHeld = heldKind;
     a.skin?.setState(animState, speed);
     // Head follows the direction of travel (or the aim pitch when standing still).
